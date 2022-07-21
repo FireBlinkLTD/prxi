@@ -1,4 +1,6 @@
 import { createServer, IncomingMessage, Server, ServerResponse } from 'http';
+import { parse as urlParse } from 'url';
+import { parse as queryParse } from 'querystring';
 import { writeJson } from './ResponseHelper';
 
 export class TestServer {
@@ -15,8 +17,8 @@ export class TestServer {
           return this.handleEcho(req, res);
         }
 
-        if (req.url === '/slow') {
-          return this.handleSlow(req, res);
+        if (req.url.indexOf('/query') === 0) {
+          return this.handleQuery(req, res);
         }
 
         console.log(`Unable to find handler for URL: ${req.url}`);
@@ -33,18 +35,6 @@ export class TestServer {
   }
 
   /**
-   * Handle /slow request
-   * @param req
-   * @param res
-   */
-   private handleSlow(req: IncomingMessage, res: ServerResponse): void {
-    setTimeout(() => {
-      writeJson(res, JSON.stringify({slow: true}));
-    }, 5 * 1000); // 5 seconds
-
-  }
-
-  /**
    * Handle /echo request
    * @param req
    * @param res
@@ -57,6 +47,17 @@ export class TestServer {
     req.on('end', () => {
       writeJson(res, Buffer.concat(chunks).toString('utf-8'));
     })
+  }
+
+  /**
+   * Handle /query request
+   * @param req
+   * @param res
+   */
+   private handleQuery(req: IncomingMessage, res: ServerResponse): void {
+    writeJson(res, JSON.stringify({
+      query: queryParse(urlParse(req.url).query),
+    }));
   }
 
   /**

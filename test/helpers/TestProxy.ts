@@ -38,10 +38,8 @@ export class TestProxy {
     throw err;
   }
 
-  private async handleOthers(path: string, req: IncomingMessage, res: ServerResponse, proxyRequest: ProxyRequest): Promise<void> {
-    await proxyRequest({
-      path,
-    });
+  private async handleOthers(req: IncomingMessage, res: ServerResponse, proxyRequest: ProxyRequest): Promise<void> {
+    await proxyRequest();
   }
 
   /**

@@ -39,7 +39,7 @@ export class HttpProxySuccessSuite {
     }
 
     @test()
-    async echoResponse(): Promise<void> {
+    async echoRequest(): Promise<void> {
       await this.initProxy();
 
       const testData = [];
@@ -51,5 +51,17 @@ export class HttpProxySuccessSuite {
         maxBodyLength: 50 * 1024 * 1024, // 50 mb
       });
       deepEqual(result.data, testData);
+    }
+
+    @test()
+    async queryRequest(): Promise<void> {
+      await this.initProxy();
+
+      const result = await axios.get(`${this.proxyUrl}/query?test=1`);
+      deepEqual(result.data, {
+        query: {
+          test: '1',
+        }
+      });
     }
 }

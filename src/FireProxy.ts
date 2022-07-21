@@ -26,27 +26,27 @@ export class FireProxy {
 
     // create server
     const server = this.server = createServer((req: IncomingMessage, res: ServerResponse) => {
-        const path = this.getPath(req);
-        const handler = requestHandlers.find(i => i.isMatching(req.method as HttpMethod, path));
-        if (handler) {
-          handler.handle(path, req, res, async (proxyConfiguration: ProxyRequestConfiguration) => {
-            await this.processProxyRequest(req, res, proxyConfiguration);
-          }).catch((err) => {
-            this.logError(`Error occurred upon making the "${req.method}:${path}" request`, err);
-            errorHandler(req, res, err).catch(err => {
-              this.logError('Unable to handle error with errorHandler', err);
-              req.destroy();
-              res.destroy();
-            });
-          });
-        } else {
-          this.logError(`Missing RequestHandler configuration for the "${req.method}:${path}" request`);
-          errorHandler(req, res, new Error(`Missing RequestHandler configuration for the "${req.method}:${path}" request`)).catch(err => {
-            this.logError(`Unable to handle error with errorHandler`, err);
+      const path = this.getPath(req);
+      const handler = requestHandlers.find(i => i.isMatching(req.method as HttpMethod, path));
+      if (handler) {
+        handler.handle(req, res, async (proxyConfiguration?: ProxyRequestConfiguration) => {
+          await this.processProxyRequest(req, res, proxyConfiguration);
+        }).catch((err) => {
+          this.logError(`Error occurred upon making the "${req.method}:${path}" request`, err);
+          errorHandler(req, res, err).catch(err => {
+            this.logError('Unable to handle error with errorHandler', err);
             req.destroy();
             res.destroy();
           });
-        }
+        });
+      } else {
+        this.logError(`Missing RequestHandler configuration for the "${req.method}:${path}" request`);
+        errorHandler(req, res, new Error(`Missing RequestHandler configuration for the "${req.method}:${path}" request`)).catch(err => {
+          this.logError(`Unable to handle error with errorHandler`, err);
+          req.destroy();
+          res.destroy();
+        });
+      }
     });
 
     server.on('upgrade', (req: IncomingMessage, socket: Duplex, head: Buffer) => {
@@ -90,43 +90,32 @@ export class FireProxy {
    * @param res
    * @param proxyConfiguration
    */
-  private async processProxyRequest(req: IncomingMessage, res: ServerResponse, proxyConfiguration: ProxyRequestConfiguration): Promise<void> {
+  private async processProxyRequest(req: IncomingMessage, res: ServerResponse, proxyConfiguration?: ProxyRequestConfiguration): Promise<void> {
+    proxyConfiguration = proxyConfiguration || {};
+
     let target = proxyConfiguration.target || this.configuration.target;
-    const {path} = proxyConfiguration;
+    const url = proxyConfiguration.url || req.url;
     const httpsTarget = this.isHttpsTarget(target);
     const request = httpsTarget ? httpsRequest : httpRequest;
     const port = proxyConfiguration.port || this.getPort(target) || (httpsTarget ? 443 : 80);
     const host = this.getHost(target);
     const method = proxyConfiguration.method || req.method;
 
-    this.logInfo(`Processing proxy request with method ${method} to ${target}${path}`);
+    this.logInfo(`Processing proxy request with method ${method} to ${target}${url}`);
 
     // TODO: pass headers
-    // TODO: pass query
 
     const options: RequestOptions = {
       method,
       host,
       port,
-      path,
+      path: url,
       timeout: 60000, // TODO: make configurable
     };
 
     await new Promise<void>((resolve, reject) => {
       const client = request(options);
       req.pipe(client);
-
-      req.on('error', (err) => {
-        this.logError(`Proxy request with method ${method} to ${host}${path} failed due to incoming request`, err);
-        client.destroy();
-        resolve();
-      });
-
-      res.on('error', (err) => {
-        this.logError(`Proxy request with method ${method} to ${host}${path} failed due to outgoing request`, err);
-        client.destroy();
-        resolve();
-      });
 
       client.on('error', (err) => {
         reject(err);
@@ -135,7 +124,7 @@ export class FireProxy {
       client.on('response', (response) => {
         if (!res.writableEnded) {
           response.on('end', () => {
-            this.logInfo(`Proxy request with method ${method} to ${host}${path} completed`);
+            this.logInfo(`Proxy request with method ${method} to ${host}${url} completed`);
             resolve();
           });
 
@@ -169,7 +158,7 @@ export class FireProxy {
    * @param target
    * @returns
    */
-  private getPort(target: string): number | null {
+  private getPort(target: string): number {
     const match = target.match(FireProxy.PORT_REGEX);
     if (match) {
       return Number(match[1]);
@@ -183,12 +172,12 @@ export class FireProxy {
    * @param target
    * @returns
    */
-   private getHost(target: string): string | null {
+   private getHost(target: string): string {
     const match = target.match(FireProxy.HOST_REGEX);
     if (match) {
       return match[1];
     }
 
-    return null;
+    throw new Error(`Unable to extract host from "${target}"`);
   }
 }

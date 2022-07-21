@@ -3,6 +3,7 @@ import { TestServer, TestProxy, assertReject, writeJson } from './helpers';
 import axios from 'axios';
 import {deepEqual, equal} from 'assert';
 import { IncomingMessage, ServerResponse } from 'http';
+import { Readable } from 'stream';
 
 @suite()
 export class HttpProxyErrorSuite {
@@ -51,27 +52,5 @@ export class HttpProxyErrorSuite {
 
       const result = await axios.post(`${this.proxyUrl}/echo`, { test: true });
       deepEqual(result.data.customError, customError);
-    }
-
-    @test()
-    async clientError(): Promise<void> {
-      const customError = 'Timeout Error';
-      this.proxy = new TestProxy();
-      await this.proxy.start();
-
-      const controller = new AbortController();
-      const result = axios.post(`${this.proxyUrl}/slow`, { test: true }, {
-        signal: controller.signal,
-      });
-
-      await new Promise<void>(res => {
-        setTimeout(() => {
-          controller.abort();
-          res();
-        }, 100);
-      })
-
-
-      assertReject(result);
     }
 }
