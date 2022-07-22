@@ -20,6 +20,12 @@ export interface Configuration {
   hostname?: string;
 
   /**
+   * Optional proxy request timeout duration
+   * @default 60000 - 1 minute
+   */
+  proxyRequestTimeout?: number;
+
+  /**
    * Request error handler
    */
   errorHandler: ErrorHandler;

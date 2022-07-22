@@ -1,5 +1,5 @@
 import { Configuration, HttpMethod, ProxyRequestConfiguration, RequestHandler } from "./interfaces";
-import { createServer, IncomingMessage, ServerResponse, Server } from "http";
+import { createServer, IncomingMessage, ServerResponse, Server, ClientRequest } from "http";
 import { Duplex } from "stream";
 import {request as httpRequest, RequestOptions} from 'http';
 import {request as httpsRequest} from 'https';
@@ -29,16 +29,23 @@ export class FireProxy {
       const path = this.getPath(req);
       const handler = requestHandlers.find(i => i.isMatching(req.method as HttpMethod, path));
       if (handler) {
-        handler.handle(req, res, async (proxyConfiguration?: ProxyRequestConfiguration) => {
-          await this.processProxyRequest(req, res, proxyConfiguration);
-        }).catch((err) => {
-          this.logError(`Error occurred upon making the "${req.method}:${path}" request`, err);
-          errorHandler(req, res, err).catch(err => {
-            this.logError('Unable to handle error with errorHandler', err);
-            req.destroy();
-            res.destroy();
+        handler.handle(
+          req,
+          res,
+          async (
+            proxyConfiguration?: ProxyRequestConfiguration,
+            onProxyRequest?: (req: ClientRequest) => Promise<void>,
+            onProxyResponse?: (res: IncomingMessage) => Promise<void>,
+          ) => {
+              await this.processProxyRequest(req, res, proxyConfiguration, onProxyRequest, onProxyResponse);
+          }).catch((err) => {
+            this.logError(`Error occurred upon making the "${req.method}:${path}" request`, err);
+            errorHandler(req, res, err).catch(err => {
+              this.logError('Unable to handle error with errorHandler', err);
+              req.destroy();
+              res.destroy();
+            });
           });
-        });
       } else {
         this.logError(`Missing RequestHandler configuration for the "${req.method}:${path}" request`);
         errorHandler(req, res, new Error(`Missing RequestHandler configuration for the "${req.method}:${path}" request`)).catch(err => {
@@ -90,7 +97,13 @@ export class FireProxy {
    * @param res
    * @param proxyConfiguration
    */
-  private async processProxyRequest(req: IncomingMessage, res: ServerResponse, proxyConfiguration?: ProxyRequestConfiguration): Promise<void> {
+  private async processProxyRequest(
+    req: IncomingMessage,
+    res: ServerResponse,
+    proxyConfiguration?: ProxyRequestConfiguration,
+    onRequest?: (req: ClientRequest) => Promise<void>,
+    onResponse?: (res: IncomingMessage) => Promise<void>,
+  ): Promise<void> {
     proxyConfiguration = proxyConfiguration || {};
 
     let target = proxyConfiguration.target || this.configuration.target;
@@ -110,26 +123,36 @@ export class FireProxy {
       host,
       port,
       path: url,
-      timeout: 60000, // TODO: make configurable
+      timeout: this.configuration.proxyRequestTimeout || 60 * 1000,
     };
 
+    const client = request(options);
+    onRequest && await onRequest(client);
+
     await new Promise<void>((resolve, reject) => {
-      const client = request(options);
       req.pipe(client);
 
       client.on('error', (err) => {
         reject(err);
       });
 
-      client.on('response', (response) => {
-        if (!res.writableEnded) {
-          response.on('end', () => {
-            this.logInfo(`Proxy request with method ${method} to ${host}${url} completed`);
-            resolve();
-          });
+      client.on('response', (response: IncomingMessage) => {
+        (onResponse && onResponse(response)) || new Promise<void>(res => res())
+          .then(
+            () => {
+              if (!res.writableEnded) {
+                response.on('end', () => {
+                  this.logInfo(`Proxy request with method ${method} to ${host}${url} completed`);
+                  resolve();
+                });
 
-          response.pipe(res);
-        }
+                response.pipe(res);
+              }
+            },
+            (err) => {
+              reject(err);
+            }
+          );
       });
     });
   }
