@@ -35,6 +35,12 @@ export interface Configuration {
    */
   requestHandlers: Array<RequestHandler>;
 
+  // Proxy request headers to add/replace/remove
+  proxyRequestHeaders?: Record<string, string | string[] | null>;
+
+  // Proxy response headers to add/replace/remove
+  proxyResponseHeaders?: Record<string, string | string[] | null>;
+
   /**
    * Info log handler
    */

@@ -1,8 +1,11 @@
-import { Configuration, HttpMethod, ProxyRequestConfiguration, RequestHandler } from "./interfaces";
-import { createServer, IncomingMessage, ServerResponse, Server, ClientRequest } from "http";
+import { Configuration, HttpMethod, ProxyRequestConfiguration } from "./interfaces";
+import { createServer, IncomingMessage, ServerResponse, Server, ClientRequest, OutgoingHttpHeaders, IncomingHttpHeaders } from "http";
 import { Duplex } from "stream";
 import {request as httpRequest, RequestOptions} from 'http';
 import {request as httpsRequest} from 'https';
+
+// empty object used in cases when default value is not provided
+const emptyObj = {};
 
 export class FireProxy {
   private server: Server = null;
@@ -104,7 +107,7 @@ export class FireProxy {
     onRequest?: (req: ClientRequest) => Promise<void>,
     onResponse?: (res: IncomingMessage) => Promise<void>,
   ): Promise<void> {
-    proxyConfiguration = proxyConfiguration || {};
+    proxyConfiguration = proxyConfiguration || emptyObj;
 
     let target = proxyConfiguration.target || this.configuration.target;
     const url = proxyConfiguration.url || req.url;
@@ -122,6 +125,7 @@ export class FireProxy {
       method,
       host,
       port,
+      headers: this.prepareProxyHeaders(req.headers, this.configuration.proxyRequestHeaders, proxyConfiguration?.proxyRequestHeaders),
       path: url,
       timeout: this.configuration.proxyRequestTimeout || 60 * 1000,
     };
@@ -157,8 +161,72 @@ export class FireProxy {
     });
   }
 
-  private isHttpsTarget(host: string): boolean {
-    return host.toLowerCase().startsWith('https://');
+  /**
+   * Prepare proxy headers
+   * @param headers
+   * @param headersToRewrite
+   * @param additionalHeadersToRewrite
+   * @returns
+   */
+  private prepareProxyHeaders(
+    headers: IncomingHttpHeaders,
+    headersToRewrite?: Record<string, string | string[]>,
+    additionalHeadersToRewrite?: Record<string, string | string[]>
+  ): OutgoingHttpHeaders {
+    const outgoing: OutgoingHttpHeaders = {};
+    headersToRewrite = headersToRewrite || emptyObj;
+    additionalHeadersToRewrite = additionalHeadersToRewrite || emptyObj;
+
+    const headersKeys = Object.keys(headers);
+    const headersToRewriteKeys = Object.keys(headersToRewrite);
+    const additionalHeadersToRewriteKeys = Object.keys(additionalHeadersToRewrite);
+
+    const finalKeys = new Set(headersKeys.map(k => k.toUpperCase()));
+    for (const key of headersToRewriteKeys) {
+      const upperKey = key.toUpperCase();
+      if (headersToRewrite[key] !== null) {
+        finalKeys.add(upperKey);
+      } else {
+        finalKeys.delete(upperKey);
+      }
+    }
+
+    for (const key of additionalHeadersToRewriteKeys) {
+      const upperKey = key.toUpperCase();
+      if (additionalHeadersToRewrite[key] !== null) {
+        finalKeys.add(upperKey);
+      } else {
+        finalKeys.delete(upperKey);
+      }
+    }
+
+    for (const key of finalKeys) {
+      const rewriteHeaderKey = headersToRewriteKeys.find(k => k.toUpperCase() === key);
+      let rewriteHeader = rewriteHeaderKey && headersToRewrite[rewriteHeaderKey];
+
+      const additionalRewriteHeaderKey = additionalHeadersToRewriteKeys.find(k => k.toUpperCase() === key);
+      const additionalRewriteHeader = additionalRewriteHeaderKey && additionalHeadersToRewrite[additionalRewriteHeaderKey];
+      if (additionalRewriteHeader !== undefined) {
+        rewriteHeader = additionalRewriteHeader;
+      }
+
+      if (rewriteHeader !== undefined) {
+        outgoing[key] = rewriteHeader;
+      } else {
+        const headerKey = headersKeys.find(k => k.toUpperCase() === key);
+        outgoing[key] = headers[headerKey];
+      }
+    }
+
+    return outgoing;
+  }
+
+  /**
+   * Check if target address is HTTPS
+   * @param target
+   */
+  private isHttpsTarget(target: string): boolean {
+    return target.toLowerCase().startsWith('https://');
   }
 
   /**

@@ -64,4 +64,31 @@ export class HttpProxySuccessSuite {
         }
       });
     }
+
+    @test()
+    async headersRequest(): Promise<void> {
+      await this.initProxy();
+
+      const result = await axios.get(`${this.proxyUrl}/headers`, {
+        headers: {
+          ReqConfigLevelCLEAR: 'empty',
+          REQConfigLevelOverwrite: 'overwrite',
+          Test: 'true',
+        }
+      });
+
+      const responseHeaders = {
+        reqconfigleveloverwrite: result.data.headers['reqconfigleveloverwrite'],
+        reqproxylevel: result.data.headers['reqproxylevel'],
+        reqproxylevelclear: result.data.headers['reqproxylevelclear'],
+        test: result.data.headers['test'],
+      }
+
+      deepEqual(responseHeaders, {
+        reqconfigleveloverwrite: 'PROXY-REQUEST-OVERWRITE',
+        reqproxylevel: 'PROXY-REQUEST',
+        reqproxylevelclear: undefined,
+        test: 'true',
+      });
+    }
 }

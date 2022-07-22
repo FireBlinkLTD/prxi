@@ -21,6 +21,10 @@ export class TestServer {
           return this.handleQuery(req, res);
         }
 
+        if (req.url.indexOf('/headers') === 0) {
+          return this.handleHeaders(req, res);
+        }
+
         console.log(`Unable to find handler for URL: ${req.url}`);
         writeJson(res, JSON.stringify({
           message: 'Not found',
@@ -57,6 +61,20 @@ export class TestServer {
    private handleQuery(req: IncomingMessage, res: ServerResponse): void {
     writeJson(res, JSON.stringify({
       query: queryParse(urlParse(req.url).query),
+    }));
+  }
+
+  /**
+   * Handle /query request
+   * @param req
+   * @param res
+   */
+   private handleHeaders(req: IncomingMessage, res: ServerResponse): void {
+    res.setHeader('ResConfigLevelCLEAR', 'empty');
+    res.setHeader('RESConfigLevelOverwrite', 'overwrite');
+
+    writeJson(res, JSON.stringify({
+      headers: req.headers,
     }));
   }
 

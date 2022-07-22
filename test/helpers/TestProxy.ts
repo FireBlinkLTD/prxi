@@ -28,6 +28,16 @@ export class TestProxy {
       ],
       logInfo: console.log,
       logError: console.error,
+      proxyRequestHeaders: {
+        ReqConfigLevel: 'CONFIG-REQUEST',
+        ReqConfigLevelOverwrite: 'CONFIG-REQUEST-OVERWRITE',
+        ReqConfigLevelClear: null,
+      },
+      proxyResponseHeaders: {
+        ResConfigLevel: 'CONFIG-RESPONSE',
+        ResConfigLevelOverwrite: 'CONFIG-RESPONSE-OVERWRITE',
+        ResConfigLevelClear: null,
+      },
     });
 
     // start it
@@ -39,7 +49,18 @@ export class TestProxy {
   }
 
   private async handleOthers(req: IncomingMessage, res: ServerResponse, proxyRequest: ProxyRequest): Promise<void> {
-    await proxyRequest();
+    await proxyRequest({
+      proxyRequestHeaders: {
+        REQProxyLevel: 'PROXY-REQUEST',
+        REQConfigLevelOverwrite: 'PROXY-REQUEST-OVERWRITE',
+        REQProxyLevelClear: null,
+      },
+      proxyResponseHeaders: {
+        RESProxyLevel: 'CONFIG-RESPONSE',
+        RESConfigLevelOverwrite: 'CONFIG-RESPONSE-OVERWRITE',
+        RESProxyLevelClear: null,
+      },
+    });
   }
 
   /**
