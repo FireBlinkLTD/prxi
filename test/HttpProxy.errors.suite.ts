@@ -53,4 +53,18 @@ export class HttpProxyErrorSuite {
       const result = await axios.post(`${this.proxyUrl}/echo`, { test: true });
       deepEqual(result.data.customError, customError);
     }
+
+    @test()
+    async missingHandler(): Promise<void> {
+      let msg = null;
+      this.proxy = new TestProxy('localhost', async (req: IncomingMessage, res: ServerResponse, err?: Error) => {
+        msg = err.message;
+        throw err;
+      }, false);
+      await this.proxy.start();
+
+      const result = axios.post(`${this.proxyUrl}/missing`, { test: true });
+      await assertReject(result);
+      equal(msg, 'Missing RequestHandler configuration for the "POST:/missing" request');
+    }
 }

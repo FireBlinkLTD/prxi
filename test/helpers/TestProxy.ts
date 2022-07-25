@@ -9,6 +9,7 @@ export class TestProxy {
   constructor(
     private host = 'localhost',
     private customErrorHandler: ErrorHandler = null,
+    private isMatching = true,
   ) {}
 
   /**
@@ -22,7 +23,7 @@ export class TestProxy {
       errorHandler: this.customErrorHandler || this.errorHandler,
       requestHandlers: [
         {
-          isMatching: () => true,
+          isMatching: () => this.isMatching,
           handle: this.handleOthers,
         }
       ],
@@ -33,7 +34,7 @@ export class TestProxy {
         ReqConfigLevelOverwrite: 'CONFIG-REQUEST-OVERWRITE',
         ReqConfigLevelClear: null,
       },
-      proxyResponseHeaders: {
+      responseHeaders: {
         ResConfigLevel: 'CONFIG-RESPONSE',
         ResConfigLevelOverwrite: 'CONFIG-RESPONSE-OVERWRITE',
         ResConfigLevelClear: null,
@@ -56,8 +57,8 @@ export class TestProxy {
         REQProxyLevelClear: null,
       },
       proxyResponseHeaders: {
-        RESProxyLevel: 'CONFIG-RESPONSE',
-        RESConfigLevelOverwrite: 'CONFIG-RESPONSE-OVERWRITE',
+        RESProxyLevel: 'PROXY-RESPONSE',
+        RESConfigLevelOverwrite: 'PROXY-RESPONSE-OVERWRITE',
         RESProxyLevelClear: null,
       },
     });

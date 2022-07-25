@@ -77,18 +77,36 @@ export class HttpProxySuccessSuite {
         }
       });
 
-      const responseHeaders = {
+      const requestHeaders = {
         reqconfigleveloverwrite: result.data.headers['reqconfigleveloverwrite'],
         reqproxylevel: result.data.headers['reqproxylevel'],
         reqproxylevelclear: result.data.headers['reqproxylevelclear'],
+        reqconfiglevel: result.data.headers['reqconfiglevel'],
         test: result.data.headers['test'],
       }
 
-      deepEqual(responseHeaders, {
+      deepEqual(requestHeaders, {
         reqconfigleveloverwrite: 'PROXY-REQUEST-OVERWRITE',
+        reqconfiglevel: 'CONFIG-REQUEST',
         reqproxylevel: 'PROXY-REQUEST',
         reqproxylevelclear: undefined,
         test: 'true',
+      });
+
+      const responseHeaders = {
+        resconfigleveloverwrite: result.headers['resconfigleveloverwrite'],
+        resconfiglevel: result.headers['resconfiglevel'],
+        resproxylevel: result.headers['resproxylevel'],
+        resproxylevelclear: result.headers['resproxylevelclear'],
+        ['res-test']: result.headers['res-test'],
+      }
+
+      deepEqual(responseHeaders, {
+        resconfigleveloverwrite: 'PROXY-RESPONSE-OVERWRITE',
+        resconfiglevel: 'CONFIG-RESPONSE',
+        resproxylevel: 'PROXY-RESPONSE',
+        resproxylevelclear: undefined,
+        ['res-test']: 'test-res',
       });
     }
 }

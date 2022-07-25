@@ -39,7 +39,7 @@ export interface Configuration {
   proxyRequestHeaders?: Record<string, string | string[] | null>;
 
   // Proxy response headers to add/replace/remove
-  proxyResponseHeaders?: Record<string, string | string[] | null>;
+  responseHeaders?: Record<string, string | string[] | null>;
 
   /**
    * Info log handler

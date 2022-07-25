@@ -1,8 +1,9 @@
 import { Configuration, HttpMethod, ProxyRequestConfiguration } from "./interfaces";
-import { createServer, IncomingMessage, ServerResponse, Server, ClientRequest, OutgoingHttpHeaders, IncomingHttpHeaders } from "http";
+import { createServer, IncomingMessage, ServerResponse, Server, ClientRequest, OutgoingHttpHeaders, IncomingHttpHeaders, OutgoingMessage } from "http";
 import { Duplex } from "stream";
 import {request as httpRequest, RequestOptions} from 'http';
 import {request as httpsRequest} from 'https';
+import { ok } from "assert";
 
 // empty object used in cases when default value is not provided
 const emptyObj = {};
@@ -32,6 +33,9 @@ export class FireProxy {
       const path = this.getPath(req);
       const handler = requestHandlers.find(i => i.isMatching(req.method as HttpMethod, path));
       if (handler) {
+        const headersToSet = this.prepareProxyHeaders(res.getHeaders(), this.configuration.responseHeaders);
+        this.updateResponseHeaders(res, headersToSet);
+
         handler.handle(
           req,
           res,
@@ -75,6 +79,7 @@ export class FireProxy {
    * Stop proxy service if running
    */
   public async stop(): Promise<void> {
+    /* istanbul ignore next */
     if (this.server) {
       await new Promise<void>((res, rej) => {
         this.server.close((err) => {
@@ -119,8 +124,6 @@ export class FireProxy {
 
     this.logInfo(`Processing proxy request with method ${method} to ${target}${url}`);
 
-    // TODO: pass headers
-
     const options: RequestOptions = {
       method,
       host,
@@ -141,6 +144,9 @@ export class FireProxy {
       });
 
       client.on('response', (response: IncomingMessage) => {
+        const headersToSet = this.prepareProxyHeaders(response.headers, this.configuration.responseHeaders, proxyConfiguration?.proxyResponseHeaders);
+        this.updateResponseHeaders(res, headersToSet);
+
         (onResponse && onResponse(response)) || new Promise<void>(res => res())
           .then(
             () => {
@@ -162,6 +168,23 @@ export class FireProxy {
   }
 
   /**
+   * Update response headers with a new set of headers
+   * @param res
+   * @param headers
+   */
+  private updateResponseHeaders(res: OutgoingMessage, headers: OutgoingHttpHeaders): void {
+    // remove all existing headers
+    for (const key of res.getHeaderNames()) {
+      res.removeHeader(key);
+    }
+
+    // set new headers
+    for (const key of Object.keys(headers)) {
+      res.setHeader(key, headers[key]);
+    }
+  }
+
+  /**
    * Prepare proxy headers
    * @param headers
    * @param headersToRewrite
@@ -169,7 +192,7 @@ export class FireProxy {
    * @returns
    */
   private prepareProxyHeaders(
-    headers: IncomingHttpHeaders,
+    headers: IncomingHttpHeaders | OutgoingHttpHeaders,
     headersToRewrite?: Record<string, string | string[]>,
     additionalHeadersToRewrite?: Record<string, string | string[]>
   ): OutgoingHttpHeaders {
@@ -181,30 +204,30 @@ export class FireProxy {
     const headersToRewriteKeys = Object.keys(headersToRewrite);
     const additionalHeadersToRewriteKeys = Object.keys(additionalHeadersToRewrite);
 
-    const finalKeys = new Set(headersKeys.map(k => k.toUpperCase()));
+    const finalKeys = new Set(headersKeys.map(k => k.toLowerCase()));
     for (const key of headersToRewriteKeys) {
-      const upperKey = key.toUpperCase();
+      const lowerKey = key.toLowerCase();
       if (headersToRewrite[key] !== null) {
-        finalKeys.add(upperKey);
+        finalKeys.add(lowerKey);
       } else {
-        finalKeys.delete(upperKey);
+        finalKeys.delete(lowerKey);
       }
     }
 
     for (const key of additionalHeadersToRewriteKeys) {
-      const upperKey = key.toUpperCase();
+      const lowerKey = key.toLowerCase();
       if (additionalHeadersToRewrite[key] !== null) {
-        finalKeys.add(upperKey);
+        finalKeys.add(lowerKey);
       } else {
-        finalKeys.delete(upperKey);
+        finalKeys.delete(lowerKey);
       }
     }
 
     for (const key of finalKeys) {
-      const rewriteHeaderKey = headersToRewriteKeys.find(k => k.toUpperCase() === key);
+      const rewriteHeaderKey = headersToRewriteKeys.find(k => k.toLowerCase() === key);
       let rewriteHeader = rewriteHeaderKey && headersToRewrite[rewriteHeaderKey];
 
-      const additionalRewriteHeaderKey = additionalHeadersToRewriteKeys.find(k => k.toUpperCase() === key);
+      const additionalRewriteHeaderKey = additionalHeadersToRewriteKeys.find(k => k.toLowerCase() === key);
       const additionalRewriteHeader = additionalRewriteHeaderKey && additionalHeadersToRewrite[additionalRewriteHeaderKey];
       if (additionalRewriteHeader !== undefined) {
         rewriteHeader = additionalRewriteHeader;
@@ -213,7 +236,7 @@ export class FireProxy {
       if (rewriteHeader !== undefined) {
         outgoing[key] = rewriteHeader;
       } else {
-        const headerKey = headersKeys.find(k => k.toUpperCase() === key);
+        const headerKey = headersKeys.find(k => k.toLowerCase() === key);
         outgoing[key] = headers[headerKey];
       }
     }
@@ -251,11 +274,12 @@ export class FireProxy {
    */
   private getPort(target: string): number {
     const match = target.match(FireProxy.PORT_REGEX);
+    /* istanbul ignore else */
     if (match) {
       return Number(match[1]);
+    } else {
+      return null;
     }
-
-    return null;
   }
 
   /**
@@ -265,10 +289,8 @@ export class FireProxy {
    */
    private getHost(target: string): string {
     const match = target.match(FireProxy.HOST_REGEX);
-    if (match) {
-      return match[1];
-    }
+    ok(match, `Unable to extract host from "${target}"`);
 
-    throw new Error(`Unable to extract host from "${target}"`);
+    return match[1];
   }
 }

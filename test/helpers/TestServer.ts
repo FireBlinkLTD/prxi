@@ -70,8 +70,9 @@ export class TestServer {
    * @param res
    */
    private handleHeaders(req: IncomingMessage, res: ServerResponse): void {
-    res.setHeader('ResConfigLevelCLEAR', 'empty');
-    res.setHeader('RESConfigLevelOverwrite', 'overwrite');
+    res.setHeader('RES-TEST', 'test-res');
+    res.setHeader('RESConfigLevelOverwrite', 'RESConfigLevelOverwrite-test');
+    res.setHeader('RESProxyLevelClear', 'RESProxyLevelClear-test');
 
     writeJson(res, JSON.stringify({
       headers: req.headers,
