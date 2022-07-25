@@ -1,4 +1,4 @@
-import { IncomingMessage, ServerResponse } from 'http';
+import { ClientRequest, IncomingMessage, ServerResponse } from 'http';
 import { ErrorHandler, FireProxy, ProxyRequest } from '../../src';
 import { TestServer } from './TestServer';
 
@@ -9,7 +9,7 @@ export class TestProxy {
   constructor(
     private host = 'localhost',
     private customErrorHandler: ErrorHandler = null,
-    private isMatching = true,
+    private isMatching = true
   ) {}
 
   /**
@@ -20,11 +20,11 @@ export class TestProxy {
     this.proxy = new FireProxy({
       port: TestProxy.PORT,
       target: `http://${this.host}:${TestServer.PORT}`,
-      errorHandler: this.customErrorHandler || this.errorHandler,
+      errorHandler: this.customErrorHandler || this.errorHandler.bind(this),
       requestHandlers: [
         {
           isMatching: () => this.isMatching,
-          handle: this.handleOthers,
+          handle: this.handleOthers.bind(this),
         }
       ],
       logInfo: console.log,

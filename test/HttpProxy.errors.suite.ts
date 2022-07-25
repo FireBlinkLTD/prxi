@@ -2,7 +2,7 @@ import {suite, test} from 'mocha-typescript';
 import { TestServer, TestProxy, assertReject, writeJson } from './helpers';
 import axios from 'axios';
 import {deepEqual, equal} from 'assert';
-import { IncomingMessage, ServerResponse } from 'http';
+import { ClientRequest, IncomingMessage, ServerResponse } from 'http';
 import { Readable } from 'stream';
 
 @suite()

@@ -41,10 +41,8 @@ export class FireProxy {
           res,
           async (
             proxyConfiguration?: ProxyRequestConfiguration,
-            onProxyRequest?: (req: ClientRequest) => Promise<void>,
-            onProxyResponse?: (res: IncomingMessage) => Promise<void>,
-          ) => {
-              await this.processProxyRequest(req, res, proxyConfiguration, onProxyRequest, onProxyResponse);
+          ): Promise<void> => {
+              await this.processProxyRequest(req, res, proxyConfiguration);
           }).catch((err) => {
             this.logError(`Error occurred upon making the "${req.method}:${path}" request`, err);
             errorHandler(req, res, err).catch(err => {
@@ -109,8 +107,6 @@ export class FireProxy {
     req: IncomingMessage,
     res: ServerResponse,
     proxyConfiguration?: ProxyRequestConfiguration,
-    onRequest?: (req: ClientRequest) => Promise<void>,
-    onResponse?: (res: IncomingMessage) => Promise<void>,
   ): Promise<void> {
     proxyConfiguration = proxyConfiguration || emptyObj;
 
@@ -134,7 +130,6 @@ export class FireProxy {
     };
 
     const client = request(options);
-    onRequest && await onRequest(client);
 
     await new Promise<void>((resolve, reject) => {
       req.pipe(client);
@@ -147,22 +142,14 @@ export class FireProxy {
         const headersToSet = this.prepareProxyHeaders(response.headers, this.configuration.responseHeaders, proxyConfiguration?.proxyResponseHeaders);
         this.updateResponseHeaders(res, headersToSet);
 
-        (onResponse && onResponse(response)) || new Promise<void>(res => res())
-          .then(
-            () => {
-              if (!res.writableEnded) {
-                response.on('end', () => {
-                  this.logInfo(`Proxy request with method ${method} to ${host}${url} completed`);
-                  resolve();
-                });
+        if (!res.writableEnded) {
+          response.on('end', () => {
+            this.logInfo(`Proxy request with method ${method} to ${host}${url} completed`);
+            resolve();
+          });
 
-                response.pipe(res);
-              }
-            },
-            (err) => {
-              reject(err);
-            }
-          );
+          response.pipe(res);
+        }
       });
     });
   }

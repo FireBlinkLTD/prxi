@@ -4,11 +4,7 @@ import { ProxyRequestConfiguration } from './ProxyRequestConfiguration';
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'OPTIONS' | 'HEAD';
 export type IsMatchingFunction = (method: Method, path: string) => boolean;
-export type ProxyRequest = (
-  configuration?: ProxyRequestConfiguration,
-  onProxyRequest?: (req: ClientRequest) => Promise<void>,
-  onProxyResponse?: (res: IncomingMessage) => Promise<void>,
-) => Promise<void>;
+export type ProxyRequest = (configuration?: ProxyRequestConfiguration) => Promise<void>;
 export type HandleFunction = (
   req: IncomingMessage,
   res: ServerResponse,
