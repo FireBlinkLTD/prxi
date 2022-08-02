@@ -114,7 +114,10 @@ export class HttpProxySuccessSuite {
     @test()
     async websocket(): Promise<void> {
       await this.initProxy();
-      const sio = io(`http://localhost:${TestProxy.PORT}`);
+      const sio = io(`http://localhost:${TestProxy.PORT}`, {
+        transports: ['websocket'],
+        reconnection: false,
+      });
 
       const send = 'test';
       let received = null;

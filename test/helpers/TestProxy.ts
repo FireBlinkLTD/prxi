@@ -10,7 +10,8 @@ export class TestProxy {
   constructor(
     private host = 'localhost',
     private customErrorHandler: ErrorHandler = null,
-    private isMatching = true
+    private isMatching = true,
+    private wsEnabled = true,
   ) {}
 
   /**
@@ -28,7 +29,7 @@ export class TestProxy {
           handle: this.handleOthers.bind(this),
         }
       ],
-      webSocketHandler: this.wsHandler.bind(this),
+      webSocketHandler: this.wsEnabled ? this.wsHandler.bind(this) : null,
       logInfo: console.log,
       logError: console.error,
       proxyRequestHeaders: {

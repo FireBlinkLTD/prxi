@@ -69,13 +69,13 @@ export class WebSocketProxyHandler {
       });
 
       client.on('response', (res: IncomingMessage) => {
-        this.logInfo(`[${requestId}] [WebSocketProxyHandler] [WebSocketProxyHandler] Received response`);
+        this.logInfo(`[${requestId}] [WebSocketProxyHandler] Received response`);
 
         if (!res.headers.upgrade) {
-          this.logInfo(`[${requestId}] [WebSocketProxyHandler] [WebSocketProxyHandler] Response doesn't have an UPGRADE header`);
+          this.logInfo(`[${requestId}] [WebSocketProxyHandler] Response doesn't have an UPGRADE header`);
 
-          // TODO: process response headers
-          socket.write(WebSocketUtils.prepareRawHeadersString(`HTTP/${res.httpVersion} ${res.statusCode} ${res.statusMessage}`, res.headers));
+          const headersToSet = RequestUtils.prepareProxyHeaders(res.headers, this.configuration.responseHeaders, proxyConfiguration.proxyResponseHeaders);
+          socket.write(WebSocketUtils.prepareRawHeadersString(`HTTP/${res.httpVersion} ${res.statusCode} ${res.statusMessage}`, headersToSet));
           res.pipe(socket);
         }
 
@@ -83,15 +83,15 @@ export class WebSocketProxyHandler {
       });
 
       client.on('upgrade', (proxyResponse: IncomingMessage, proxySocket: Socket, proxyHead: Buffer) => {
-        this.logInfo(`[${requestId}] [WebSocketProxyHandler] [WebSocketProxyHandler] Upgrade received`);
+        this.logInfo(`[${requestId}] [WebSocketProxyHandler] Upgrade received`);
 
         proxySocket.on('error', (err) => {
-          this.logError(`[${requestId}] [WebSocketProxyHandler] [WebSocketProxyHandler] ProxySocket error`, err);
+          this.logError(`[${requestId}] [WebSocketProxyHandler] ProxySocket error`, err);
           // TODO
         });
 
         proxySocket.on('end', () => {
-          this.logInfo(`[${requestId}] [WebSocketProxyHandler] [WebSocketProxyHandler] ProxySocket end`);
+          this.logInfo(`[${requestId}] [WebSocketProxyHandler] ProxySocket end`);
           resolve();
         });
 
@@ -103,7 +103,7 @@ export class WebSocketProxyHandler {
 
         // end proxy socket when incoming fails
         socket.on('error', (err) => {
-          this.logError(`[${requestId}] [WebSocketProxyHandler] [WebSocketProxyHandler] Socket error`, err);
+          this.logError(`[${requestId}] [WebSocketProxyHandler] Socket error`, err);
           // TODO: log error
           proxySocket.end();
         });
@@ -111,8 +111,8 @@ export class WebSocketProxyHandler {
         // keep socket alive
         WebSocketUtils.keepAlive(proxySocket);
 
-        // TODO: process response headers
-        socket.write(WebSocketUtils.prepareRawHeadersString('HTTP/1.1 101 Switching Protocols', proxyResponse.headers));
+        const headersToSet = RequestUtils.prepareProxyHeaders(proxyResponse.headers, this.configuration.responseHeaders, proxyConfiguration.proxyResponseHeaders);
+        socket.write(WebSocketUtils.prepareRawHeadersString(`HTTP/${req.httpVersion} 101 Switching Protocols`, headersToSet));
         proxySocket.pipe(socket).pipe(proxySocket);
       });
     });

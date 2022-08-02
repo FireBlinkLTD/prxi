@@ -1,7 +1,7 @@
 import {suite, test} from 'mocha-typescript';
 import { TestServer, TestProxy, assertReject, writeJson } from './helpers';
 import axios from 'axios';
-import {deepEqual, equal} from 'assert';
+import {deepEqual, equal, strictEqual} from 'assert';
 import { IncomingMessage, ServerResponse } from 'http';
 import {io} from 'socket.io-client';
 
@@ -69,22 +69,26 @@ export class HttpProxyErrorSuite {
     }
 
     @test()
-    async websocket(): Promise<void> {
-      this.proxy = new TestProxy();
+    async noWebSocketHandler(): Promise<void> {
+      this.proxy = new TestProxy('localhost', null, true, false);
       await this.proxy.start();
 
-      const sio = io(`http://localhost:${TestProxy.PORT}`);
+      const sio = io(`http://localhost:${TestProxy.PORT}`, {
+        transports: ['websocket'],
+        reconnection: false,
+      });
 
-      await new Promise<void>((res, rej) => {
+      const err = await assertReject(new Promise<void>((res, rej) => {
+        sio.on('connect_error', (err) => {
+          rej(err);
+        });
+
         setTimeout(() => {
           sio.disconnect();
           rej(new Error('Unable to connect to WS'));
         }, 2000);
+      }));
 
-        sio.on('connect', () => {
-          sio.io._close();
-          res();
-        });
-      });
+      strictEqual(err.message, `websocket error`);
     }
 }

@@ -1,4 +1,4 @@
-import { IncomingHttpHeaders } from "http";
+import { OutgoingHttpHeaders } from "http";
 import { Socket } from "net";
 
 export class WebSocketUtils {
@@ -10,7 +10,7 @@ export class WebSocketUtils {
    * @param other
    * @returns
    */
-  public static prepareRawHeadersString(head: string, other: IncomingHttpHeaders) {
+  public static prepareRawHeadersString(head: string, other: OutgoingHttpHeaders) {
     const result = [head];
 
     // write other headers
@@ -18,7 +18,7 @@ export class WebSocketUtils {
       let values = other[key];
       // istanbul ignore else
       if (!Array.isArray(values)) {
-        values = [values];
+        values = [values.toString()];
       }
 
       for (const value of values) {

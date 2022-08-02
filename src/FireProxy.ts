@@ -1,7 +1,7 @@
 import { Configuration, HttpMethod, ProxyRequestConfiguration } from "./interfaces";
 import { createServer, IncomingMessage, ServerResponse, Server } from "http";
 import { Socket } from "net";
-import { RequestUtils } from "./utils";
+import { RequestUtils, WebSocketUtils } from "./utils";
 import { HttpProxyHandler, WebSocketProxyHandler } from "./handlers";
 
 // empty object used in cases when default value is not provided
@@ -81,16 +81,24 @@ export class FireProxy {
     server.on('upgrade', (req: IncomingMessage, socket: Socket, head: Buffer) => {
       const requestId = id++;
       // handle websocket
-      if (req.headers.upgrade?.toLowerCase() === 'websocket' && req.method.toUpperCase() === 'GET') {
-        this.configuration
-          ?.webSocketHandler(req, socket, head, async (proxyConfiguration?: ProxyRequestConfiguration): Promise<void> => {
-            await webSocketProxyHandler.proxy(requestId, req, socket, head, proxyConfiguration);
-          })
-          ?.catch(err => {
-            this.logError(`[${requestId}] [FireProxy] Unable to handle websocket request`, err);
-            req.destroy();
-          });
+      if (
+        req.headers.upgrade?.toLowerCase() === 'websocket'
+        && req.method.toUpperCase() === 'GET'
+        && this.configuration.webSocketHandler
+      ) {
+        this.configuration.webSocketHandler(req, socket, head, async (proxyConfiguration?: ProxyRequestConfiguration): Promise<void> => {
+          await webSocketProxyHandler.proxy(requestId, req, socket, head, proxyConfiguration);
+        })
+        .catch(err => {
+          this.logError(`[${requestId}] [FireProxy] Unable to handle websocket request`, err);
+          req.destroy();
+        });
       } else {
+        this.logInfo(`[${requestId}] [FireProxy] Unable to handle upgrade request`);
+
+        const headersToSet = RequestUtils.prepareProxyHeaders({}, this.configuration.responseHeaders);
+        socket.write(WebSocketUtils.prepareRawHeadersString(`HTTP/${req.httpVersion} 405 Upgrade could not be processed`, headersToSet));
+
         // destroy socket cause we can't handle it
         socket.destroy();
       }
