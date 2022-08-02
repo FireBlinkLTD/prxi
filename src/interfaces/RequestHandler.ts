@@ -1,5 +1,6 @@
 import { Method } from 'axios';
-import { ClientRequest, IncomingMessage, ServerResponse } from 'http';
+import { IncomingMessage, ServerResponse } from 'http';
+import { Socket } from 'net';
 import { ProxyRequestConfiguration } from './ProxyRequestConfiguration';
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'OPTIONS' | 'HEAD';
@@ -8,6 +9,13 @@ export type ProxyRequest = (configuration?: ProxyRequestConfiguration) => Promis
 export type HandleFunction = (
   req: IncomingMessage,
   res: ServerResponse,
+  proxyRequest: ProxyRequest,
+) => Promise<void>;
+
+export type WebSocketHandlerFunction = (
+  req: IncomingMessage,
+  socket: Socket,
+  head: Buffer,
   proxyRequest: ProxyRequest,
 ) => Promise<void>;
 

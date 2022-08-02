@@ -1,5 +1,5 @@
 import { IncomingMessage, ServerResponse } from 'http';
-import { RequestHandler } from './RequestHandler';
+import { RequestHandler, WebSocketHandlerFunction } from './RequestHandler';
 
 export type ErrorHandler = (req: IncomingMessage, res: ServerResponse, err: Error) => Promise<void>;
 
@@ -35,10 +35,19 @@ export interface Configuration {
    */
   requestHandlers: Array<RequestHandler>;
 
-  // Proxy request headers to add/replace/remove
+  /**
+   * WebSocket request handler
+   */
+  webSocketHandler?: WebSocketHandlerFunction;
+
+  /**
+   * Proxy request headers to add/replace/remove
+   */
   proxyRequestHeaders?: Record<string, string | string[] | null>;
 
-  // Proxy response headers to add/replace/remove
+  /**
+   * Proxy response headers to add/replace/remove
+   */
   responseHeaders?: Record<string, string | string[] | null>;
 
   /**

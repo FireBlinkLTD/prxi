@@ -1,4 +1,5 @@
 import { ClientRequest, IncomingMessage, ServerResponse } from 'http';
+import { Duplex } from 'stream';
 import { ErrorHandler, FireProxy, ProxyRequest } from '../../src';
 import { TestServer } from './TestServer';
 
@@ -27,6 +28,7 @@ export class TestProxy {
           handle: this.handleOthers.bind(this),
         }
       ],
+      webSocketHandler: this.wsHandler.bind(this),
       logInfo: console.log,
       logError: console.error,
       proxyRequestHeaders: {
@@ -45,10 +47,22 @@ export class TestProxy {
     await this.proxy.start();
   }
 
+  /**
+   * Handle error
+   * @param req
+   * @param res
+   * @param err
+   */
   private async errorHandler(req: IncomingMessage, res: ServerResponse, err?: Error): Promise<void> {
     throw err;
   }
 
+  /**
+   * Proxy all requests
+   * @param req
+   * @param res
+   * @param proxyRequest
+   */
   private async handleOthers(req: IncomingMessage, res: ServerResponse, proxyRequest: ProxyRequest): Promise<void> {
     await proxyRequest({
       proxyRequestHeaders: {
@@ -62,6 +76,17 @@ export class TestProxy {
         RESProxyLevelClear: null,
       },
     });
+  }
+
+  /**
+   * Proxy WS request
+   * @param req
+   * @param socket
+   * @param head
+   * @param handle
+   */
+  private async wsHandler(req: IncomingMessage, socket: Duplex, head: Buffer, handle: () => Promise<void>) {
+    handle();
   }
 
   /**

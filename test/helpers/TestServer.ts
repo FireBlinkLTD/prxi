@@ -2,10 +2,12 @@ import { createServer, IncomingMessage, Server, ServerResponse } from 'http';
 import { parse as urlParse } from 'url';
 import { parse as queryParse } from 'querystring';
 import { writeJson } from './ResponseHelper';
+import  { Server as SocketIOServer } from 'socket.io';
 
 export class TestServer {
   public static readonly PORT = 7777;
   private server: Server;
+  private socketIO: SocketIOServer;
 
   /**
    * Start server
@@ -29,6 +31,21 @@ export class TestServer {
         writeJson(res, JSON.stringify({
           message: 'Not found',
         }), 404);
+      });
+
+      // add socket.io
+      this.socketIO = new SocketIOServer(this.server);
+      this.socketIO.on('connection', (socket) => {
+        socket.on('echo', (msg) => {
+          console.log(`Socket.IO "echo" message received: ${msg}`);
+          socket.emit('echo', msg);
+        });
+
+        socket.on('disconnect', () => {
+          console.log('Socket.IO disconnected');
+        });
+
+        console.log('Socket.IO connected');
       });
 
       this.server.listen(TestServer.PORT, () => {

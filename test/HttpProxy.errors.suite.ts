@@ -2,8 +2,8 @@ import {suite, test} from 'mocha-typescript';
 import { TestServer, TestProxy, assertReject, writeJson } from './helpers';
 import axios from 'axios';
 import {deepEqual, equal} from 'assert';
-import { ClientRequest, IncomingMessage, ServerResponse } from 'http';
-import { Readable } from 'stream';
+import { IncomingMessage, ServerResponse } from 'http';
+import {io} from 'socket.io-client';
 
 @suite()
 export class HttpProxyErrorSuite {
@@ -66,5 +66,25 @@ export class HttpProxyErrorSuite {
       const result = axios.post(`${this.proxyUrl}/missing`, { test: true });
       await assertReject(result);
       equal(msg, 'Missing RequestHandler configuration for the "POST:/missing" request');
+    }
+
+    @test()
+    async websocket(): Promise<void> {
+      this.proxy = new TestProxy();
+      await this.proxy.start();
+
+      const sio = io(`http://localhost:${TestProxy.PORT}`);
+
+      await new Promise<void>((res, rej) => {
+        setTimeout(() => {
+          sio.disconnect();
+          rej(new Error('Unable to connect to WS'));
+        }, 2000);
+
+        sio.on('connect', () => {
+          sio.io._close();
+          res();
+        });
+      });
     }
 }
