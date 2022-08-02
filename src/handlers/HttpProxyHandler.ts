@@ -26,12 +26,15 @@ export class HttpProxyHandler {
     res: ServerResponse,
     proxyConfiguration?: ProxyRequestConfiguration,
   ): Promise<void> {
+    // istanbul ignore next
     proxyConfiguration = proxyConfiguration || emptyObj;
 
     let target = proxyConfiguration.target || this.configuration.target;
     const url = proxyConfiguration.url || req.url;
     const httpsTarget = RequestUtils.isHttpsTarget(target);
+    // istanbul ignore next
     const request = httpsTarget ? httpsRequest : httpRequest;
+    // istanbul ignore next
     const port = proxyConfiguration.port || RequestUtils.getPort(target) || (httpsTarget ? 443 : 80);
     const host = RequestUtils.getHost(target);
     const method = proxyConfiguration.method || req.method;
@@ -42,7 +45,13 @@ export class HttpProxyHandler {
       method,
       host,
       port,
-      headers: RequestUtils.prepareProxyHeaders(req.headers, this.configuration.proxyRequestHeaders, proxyConfiguration?.proxyRequestHeaders),
+
+      headers: RequestUtils.prepareProxyHeaders(
+        req.headers,
+        this.configuration.proxyRequestHeaders,
+        // istanbul ignore next
+        proxyConfiguration?.proxyRequestHeaders,
+      ),
       path: url,
       timeout: this.configuration.proxyRequestTimeout || 60 * 1000,
     };
@@ -57,9 +66,15 @@ export class HttpProxyHandler {
       });
 
       client.on('response', (response: IncomingMessage) => {
-        const headersToSet = RequestUtils.prepareProxyHeaders(response.headers, this.configuration.responseHeaders, proxyConfiguration?.proxyResponseHeaders);
+        const headersToSet = RequestUtils.prepareProxyHeaders(
+          response.headers,
+          this.configuration.responseHeaders,
+          // istanbul ignore next
+          proxyConfiguration?.proxyResponseHeaders
+        );
         RequestUtils.updateResponseHeaders(res, headersToSet);
 
+        // istanbul ignore else
         if (!res.writableEnded) {
           response.on('end', () => {
             this.logInfo(`[${requestId}] [HttpProxyHandler] Proxy request with method ${method} to ${host}${url} completed`);
@@ -67,6 +82,8 @@ export class HttpProxyHandler {
           });
 
           response.pipe(res);
+        } else {
+          resolve();
         }
       });
     });
