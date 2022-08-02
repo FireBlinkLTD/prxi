@@ -91,4 +91,30 @@ export class HttpProxyErrorSuite {
 
       strictEqual(err.message, `websocket error`);
     }
+
+    @test()
+    async failedWebSocketHandler(): Promise<void> {
+      this.proxy = new TestProxy('localhost', null, true, async () => {
+        throw new Error('test');
+      });
+      await this.proxy.start();
+
+      const sio = io(`http://localhost:${TestProxy.PORT}`, {
+        transports: ['websocket'],
+        reconnection: false,
+      });
+
+      const err = await assertReject(new Promise<void>((res, rej) => {
+        sio.on('connect_error', (err) => {
+          rej(err);
+        });
+
+        setTimeout(() => {
+          sio.disconnect();
+          rej(new Error('Unable to connect to WS'));
+        }, 2000);
+      }));
+
+      strictEqual(err.message, `websocket error`);
+    }
 }

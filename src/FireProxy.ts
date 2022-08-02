@@ -15,10 +15,12 @@ export class FireProxy {
   constructor(private configuration: Configuration) {
     const {logInfo, logError} = this.configuration;
     this.logInfo = (msg) => {
+      // istanbul ignore next
       (logInfo || this.logInfo)(`[${new Date().toISOString()}] ${msg}`);
     };
 
     this.logError = (msg, err) => {
+      // istanbul ignore next
       (logError || this.logError)(`[${new Date().toISOString()}] ${msg}`, err);
     };
   }
@@ -82,7 +84,7 @@ export class FireProxy {
       const requestId = id++;
       // handle websocket
       if (
-        req.headers.upgrade?.toLowerCase() === 'websocket'
+        req.headers.upgrade.toLowerCase() === 'websocket'
         && req.method.toUpperCase() === 'GET'
         && this.configuration.webSocketHandler
       ) {
@@ -91,7 +93,12 @@ export class FireProxy {
         })
         .catch(err => {
           this.logError(`[${requestId}] [FireProxy] Unable to handle websocket request`, err);
-          req.destroy();
+
+          const headersToSet = RequestUtils.prepareProxyHeaders({}, this.configuration.responseHeaders);
+          socket.write(WebSocketUtils.prepareRawHeadersString(`HTTP/${req.httpVersion} 500 Unexpected error ocurred`, headersToSet));
+
+          // destroy socket cause we can't handle it
+          socket.destroy();
         });
       } else {
         this.logInfo(`[${requestId}] [FireProxy] Unable to handle upgrade request`);

@@ -1,6 +1,6 @@
 import { ClientRequest, IncomingMessage, ServerResponse } from 'http';
 import { Duplex } from 'stream';
-import { ErrorHandler, FireProxy, ProxyRequest } from '../../src';
+import { ErrorHandler, FireProxy, ProxyRequest, WebSocketHandlerFunction } from '../../src';
 import { TestServer } from './TestServer';
 
 export class TestProxy {
@@ -11,7 +11,7 @@ export class TestProxy {
     private host = 'localhost',
     private customErrorHandler: ErrorHandler = null,
     private isMatching = true,
-    private wsEnabled = true,
+    private customWsHandler: WebSocketHandlerFunction | null | false = null,
   ) {}
 
   /**
@@ -29,7 +29,7 @@ export class TestProxy {
           handle: this.handleOthers.bind(this),
         }
       ],
-      webSocketHandler: this.wsEnabled ? this.wsHandler.bind(this) : null,
+      webSocketHandler: this.customWsHandler ? this.customWsHandler : (this.customWsHandler !== false ? this.wsHandler.bind(this) : null),
       logInfo: console.log,
       logError: console.error,
       proxyRequestHeaders: {
