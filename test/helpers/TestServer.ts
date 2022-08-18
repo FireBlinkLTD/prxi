@@ -2,7 +2,7 @@ import { createServer, IncomingMessage, Server, ServerResponse } from 'http';
 import { parse as urlParse } from 'url';
 import { parse as queryParse } from 'querystring';
 import { writeJson } from './ResponseHelper';
-import  { Server as SocketIOServer } from 'socket.io';
+import  { Server as SocketIOServer, Socket } from 'socket.io';
 
 export class TestServer {
   public static readonly PORT = 7777;

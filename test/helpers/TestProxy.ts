@@ -1,4 +1,4 @@
-import { ClientRequest, IncomingMessage, ServerResponse } from 'http';
+import { IncomingMessage, ServerResponse } from 'http';
 import { Duplex } from 'stream';
 import { ErrorHandler, FireProxy, ProxyRequest, WebSocketHandlerFunction } from '../../src';
 import { TestServer } from './TestServer';

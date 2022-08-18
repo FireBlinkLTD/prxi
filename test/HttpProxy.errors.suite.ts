@@ -4,6 +4,10 @@ import axios from 'axios';
 import {deepEqual, equal, strictEqual} from 'assert';
 import { IncomingMessage, ServerResponse } from 'http';
 import {io} from 'socket.io-client';
+import { Socket } from 'net';
+import { ProxyRequest } from '../src';
+import { WebSocketProxyHandler } from '../src/handlers';
+import { resolve } from 'path';
 
 @suite()
 export class HttpProxyErrorSuite {
@@ -116,5 +120,89 @@ export class HttpProxyErrorSuite {
       }));
 
       strictEqual(err.message, `websocket error`);
+    }
+
+    @test()
+    async erroredWebSocketHandler(): Promise<void> {
+      this.proxy = new TestProxy();
+      await this.proxy.start();
+
+      const sio = io(`http://localhost:${TestProxy.PORT}`, {
+        transports: ['websocket'],
+        reconnection: false,
+      });
+
+      const err = await assertReject(new Promise<void>((res, rej) => {
+        setTimeout(() => {
+          sio.disconnect();
+          rej(new Error('Unable to connect to WS'));
+        }, 2000);
+
+        sio.on('connect', () => {
+          WebSocketProxyHandler.debug.upstreamRequest.emit('error', new Error('Upstream fake error'));
+        });
+
+        sio.on('disconnect', (reason) => {
+          rej(new Error(reason));
+        })
+      }));
+
+      strictEqual(err.message, `transport close`);
+    }
+
+    @test()
+    async erroredUpstreamSocketHandler(): Promise<void> {
+      this.proxy = new TestProxy();
+      await this.proxy.start();
+
+      const sio = io(`http://localhost:${TestProxy.PORT}`, {
+        transports: ['websocket'],
+        reconnection: false,
+      });
+
+      const err = await assertReject(new Promise<void>((res, rej) => {
+        setTimeout(() => {
+          sio.disconnect();
+          rej(new Error('Unable to connect to WS'));
+        }, 2000);
+
+        sio.on('connect', () => {
+          WebSocketProxyHandler.debug.upstreamSocket.emit('error', new Error('Proxy fake error'));
+        });
+
+        sio.on('disconnect', (reason) => {
+          rej(new Error(reason));
+        })
+      }));
+
+      strictEqual(err.message, `transport close`);
+    }
+
+    @test()
+    async erroredIncomingSocketHandler(): Promise<void> {
+      this.proxy = new TestProxy();
+      await this.proxy.start();
+
+      const sio = io(`http://localhost:${TestProxy.PORT}`, {
+        transports: ['websocket'],
+        reconnection: false,
+      });
+
+      const err = await assertReject(new Promise<void>((res, rej) => {
+        setTimeout(() => {
+          sio.disconnect();
+          rej(new Error('Unable to connect to WS'));
+        }, 2000);
+
+        sio.on('connect', () => {
+          WebSocketProxyHandler.debug.incomingSocket.emit('error', new Error('Proxy fake error'));
+        });
+
+        sio.on('disconnect', (reason) => {
+          rej(new Error(reason));
+        })
+      }));
+
+      strictEqual(err.message, `transport close`);
     }
 }
