@@ -42,10 +42,14 @@ export class WebSocketProxyHandler {
       WebSocketProxyHandler.debug.incomingSocket = socket;
       proxyConfiguration = proxyConfiguration || emptyObj;
 
+      // istanbul ignore next
       let target = proxyConfiguration.target || this.configuration.target;
+      // istanbul ignore next
       const url = proxyConfiguration.url || req.url;
       const httpsTarget = RequestUtils.isHttpsTarget(target);
+      // istanbul ignore next
       const request = httpsTarget ? httpsRequest : httpRequest;
+      // istanbul ignore next
       const port = proxyConfiguration.port || RequestUtils.getPort(target) || (httpsTarget ? 443 : 80);
       const host = RequestUtils.getHost(target);
 
@@ -55,7 +59,13 @@ export class WebSocketProxyHandler {
         method: 'GET',
         host,
         port,
-        headers: RequestUtils.prepareProxyHeaders(req.headers, this.configuration.proxyRequestHeaders, proxyConfiguration?.proxyRequestHeaders),
+
+        headers: RequestUtils.prepareProxyHeaders(
+          req.headers,
+          this.configuration.proxyRequestHeaders,
+          // istanbul ignore next
+          proxyConfiguration?.proxyRequestHeaders,
+        ),
         path: url,
         timeout: this.configuration.proxyRequestTimeout || 60 * 1000,
       };
@@ -77,6 +87,7 @@ export class WebSocketProxyHandler {
 
         let ps: Socket = null;
         client.on('error', (err) => {
+          // istanbul ignore next
           ps?.destroy();
           socket.end();
 
@@ -86,6 +97,7 @@ export class WebSocketProxyHandler {
         client.on('response', (res: IncomingMessage) => {
           this.logInfo(`[${requestId}] [WebSocketProxyHandler] Received response`);
 
+          // istanbul ignore else
           if (!res.headers.upgrade) {
             this.logInfo(`[${requestId}] [WebSocketProxyHandler] Response doesn't have an UPGRADE header`);
 

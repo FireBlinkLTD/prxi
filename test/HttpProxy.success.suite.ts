@@ -17,7 +17,7 @@ export class HttpProxySuccessSuite {
      * Before hook
      */
     async before(): Promise<void> {
-      this.server = new TestServer();
+      this.server = new TestServer(true);
       this.proxy = null;
 
       await this.server.start();

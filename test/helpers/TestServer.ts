@@ -9,6 +9,10 @@ export class TestServer {
   private server: Server;
   private socketIO: SocketIOServer;
 
+  constructor(private wsEnabled: boolean) {
+
+  }
+
   /**
    * Start server
    */
@@ -33,20 +37,22 @@ export class TestServer {
         }), 404);
       });
 
-      // add socket.io
-      this.socketIO = new SocketIOServer(this.server);
-      this.socketIO.on('connection', (socket) => {
-        socket.on('echo', (msg) => {
-          console.log(`Socket.IO "echo" message received: ${msg}`);
-          socket.emit('echo', msg);
-        });
+      if (this.wsEnabled) {
+        // add socket.io
+        this.socketIO = new SocketIOServer(this.server);
+        this.socketIO.on('connection', (socket) => {
+          socket.on('echo', (msg) => {
+            console.log(`Socket.IO "echo" message received: ${msg}`);
+            socket.emit('echo', msg);
+          });
 
-        socket.on('disconnect', () => {
-          console.log('Socket.IO disconnected');
-        });
+          socket.on('disconnect', () => {
+            console.log('Socket.IO disconnected');
+          });
 
-        console.log('Socket.IO connected');
-      });
+          console.log('Socket.IO connected');
+        });
+      }
 
       this.server.listen(TestServer.PORT, () => {
         console.log(`TestServer started on port ${TestServer.PORT}`);

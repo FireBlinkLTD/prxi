@@ -4,10 +4,7 @@ import axios from 'axios';
 import {deepEqual, equal, strictEqual} from 'assert';
 import { IncomingMessage, ServerResponse } from 'http';
 import {io} from 'socket.io-client';
-import { Socket } from 'net';
-import { ProxyRequest } from '../src';
 import { WebSocketProxyHandler } from '../src/handlers';
-import { resolve } from 'path';
 
 @suite()
 export class HttpProxyErrorSuite {
@@ -22,7 +19,7 @@ export class HttpProxyErrorSuite {
      * Before hook
      */
     async before(): Promise<void> {
-      this.server = new TestServer();
+      this.server = new TestServer(true);
       await this.server.start();
     }
 
@@ -204,5 +201,34 @@ export class HttpProxyErrorSuite {
       }));
 
       strictEqual(err.message, `transport close`);
+    }
+
+    @test()
+    async wsNotSupportedByUpstream(): Promise<void> {
+      // restart server with WS disabled
+      await this.server.stop();
+      this.server = new TestServer(false);
+      await this.server.start();
+
+      this.proxy = new TestProxy();
+      await this.proxy.start();
+
+      const sio = io(`http://localhost:${TestProxy.PORT}`, {
+        transports: ['websocket'],
+        reconnection: false,
+      });
+
+      const err = await assertReject(new Promise<void>((res, rej) => {
+        sio.on('connect_error', (err) => {
+          rej(err);
+        });
+
+        setTimeout(() => {
+          sio.disconnect();
+          rej(new Error('Unable to connect to WS'));
+        }, 2000);
+      }));
+
+      strictEqual(err.message, `websocket error`);
     }
 }
