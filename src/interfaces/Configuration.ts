@@ -53,10 +53,10 @@ export interface Configuration {
   /**
    * Info log handler
    */
-  logInfo?: (msg: string) => void;
+  logInfo?: (message?: any, ...params: any[]) => void;
 
   /**
    * Error log handler
    */
-  logError?: (msg: string, err?: Error) => void;
+  logError?: (message?: any, ...params: any[]) => void;
 }

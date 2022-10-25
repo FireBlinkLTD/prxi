@@ -1,7 +1,7 @@
 import { HttpMethod } from './RequestHandler';
 
 export interface ProxyRequestConfiguration {
-  // Request url
+  // Request url (path)
   url?: string;
 
   // Override HTTP method

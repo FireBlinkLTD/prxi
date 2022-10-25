@@ -4,13 +4,10 @@ import { Socket } from "net";
 import { RequestUtils, WebSocketUtils } from "./utils";
 import { HttpProxyHandler, WebSocketProxyHandler } from "./handlers";
 
-// empty object used in cases when default value is not provided
-const emptyObj = {};
-
 export class FireProxy {
   private server: Server = null;
-  private logInfo = (msg: string) => {};
-  private logError = (msg: string, err?: Error) => {};
+  private logInfo: (message?: any, ...params: any[]) => void;
+  private logError: (message?: any, ...params: any[]) => void;
 
   constructor(private configuration: Configuration) {
     const {logInfo, logError} = this.configuration;
