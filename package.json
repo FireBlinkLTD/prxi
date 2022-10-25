@@ -5,6 +5,7 @@
   "main": "dist/index.js",
   "author": "Vladyslav Tkachenko <vlad@fireblink.com>",
   "license": "MIT",
+  "keywords": ["proxy", "reverse proxy", "http", "websocket"],
   "scripts": {
     "build": "tsc",
     "test:clean": "rimraf ./coverage",
