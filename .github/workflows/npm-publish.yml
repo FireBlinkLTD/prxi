@@ -9,10 +9,11 @@ jobs:
   build_and_test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-node@v1
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
         with:
           node-version: '16.x'
+          registry-url: 'https://registry.npmjs.org'
 
       - run: yarn install
       - run: yarn test
@@ -21,12 +22,12 @@ jobs:
       # send test coverage
       - run: bash <(curl -s https://codecov.io/bash) -f ./coverage/coverage.lcov
 
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         with:
           name: coverage
           path: ./coverage/
 
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         with:
           name: mochawesome-report
           path: ./mochawesome-report/
@@ -35,11 +36,12 @@ jobs:
     needs: [build_and_test]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-node@v1
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
         with:
           node-version: '16.x'
           registry-url: 'https://registry.npmjs.org'
+
       - run: yarn install
       - run: yarn build
       - run: yarn install --prod
