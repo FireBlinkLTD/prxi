@@ -1,7 +1,7 @@
 import {suite, test} from 'mocha-typescript';
 import { TestServer, TestProxy, assertReject, writeJson } from './helpers';
 import axios from 'axios';
-import {deepEqual, equal, strictEqual} from 'assert';
+import {deepEqual, equal, strictEqual, match} from 'assert';
 import { IncomingMessage, ServerResponse } from 'http';
 import {io} from 'socket.io-client';
 import { WebSocketProxyHandler } from '../src/handlers';
@@ -45,7 +45,7 @@ export class HttpProxyErrorSuite {
     async addressNotFoundPassErrorHandler(): Promise<void> {
       const customError = 'Custom Error';
       this.proxy = new TestProxy('non-existing-host', async (req: IncomingMessage, res: ServerResponse, err: Error): Promise<void> => {
-        equal(err.message, 'getaddrinfo ENOTFOUND non-existing-host');
+        match(err.message, /getaddrinfo .* non-existing-host/gi);
 
         await writeJson(res, JSON.stringify({customError}));
       });
