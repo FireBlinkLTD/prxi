@@ -1,5 +1,10 @@
 # @fireblinkltd/fireproxy
 
+[![Tests](https://github.com/FireBlinkLTD/FireProxy/actions/workflows/test.yml/badge.svg)](https://github.com/FireBlinkLTD/FireProxy/actions?query=workflow%3ATests)
+[![Known Vulnerabilities](https://snyk.io/test/github/FireBlinkLTD/FireProxy/badge.svg)](https://snyk.io/test/github/FireBlinkLTD/FireProxy)
+[![codecov](https://codecov.io/gh/FireBlinkLTD/FireProxy/branch/master/graph/badge.svg)](https://codecov.io/gh/FireBlinkLTD/FireProxy)
+
+
 FireProxy is a zero dependency reverse proxy module for Node.js
 
 # Installation
@@ -21,7 +26,7 @@ import {FireProxy, HttpMethod, ProxyRequest} from '@fireblinkltd/fireproxy';
 const proxy = new FireProxy({
   // port to listen icomming requests on
   port: TestProxy.PORT,
-  // optional hostname where proxy should listen for incomming connections
+  // optional hostname where proxy should listen for incoming connections
   hostname: 'localhost',
   // optional proxy request timeout (default value: 60,000 - 1 minute)
   proxyRequestTimeout: 30 * 1000,
@@ -91,6 +96,10 @@ const requestHandlers = [
   }
 ];
 
+// start the proxy server
+// later it can be stopped by calling `stop` method.
+await proxy.start();
+
 /**
  *  WebSocket request handle
  */
@@ -130,5 +139,4 @@ const webSocketHandler = async (req: IncomingMessage, socket: Duplex, head: Buff
 const errorHandler = async (req: IncomingMessage, res: ServerResponse, err?: Error): Promise<void> {
     throw err;
 };
-
 ```
