@@ -1,13 +1,14 @@
 {
-  "name": "fireproxy",
+  "name": "@fireblinkltd/fireproxy",
   "version": "0.0.1",
-  "description": "FireProxy HTTP/WS proxy module",
+  "description": "Zero dependencies HTTP/WS proxy module",
   "main": "dist/index.js",
   "author": "Vladyslav Tkachenko <vlad@fireblink.com>",
   "license": "MIT",
   "scripts": {
     "build": "tsc",
-    "test": "nyc --reporter=html --reporter=text mocha"
+    "test": "nyc --reporter=html --reporter=text mocha",
+    "test:coverage": "nyc report --reporter=text-lcov > ./coverage/coverage.lcov"
   },
   "devDependencies": {
     "@types/node": "^18.0.6",

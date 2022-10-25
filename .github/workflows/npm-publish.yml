@@ -1,0 +1,62 @@
+name: Public NPM Package
+
+on:
+  push:
+    tags:
+      - '*.*.*'
+
+jobs:
+  build_and_test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v1
+        with:
+          node-version: '16.x'
+
+      - run: yarn install
+      - run: yarn test
+      - run: yarn test:coverage
+
+      # send test coverage
+      - run: bash <(curl -s https://codecov.io/bash) -f ./coverage/coverage.lcov
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: coverage
+          path: ./coverage/
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: mochawesome-report
+          path: ./mochawesome-report/
+
+  build_and_publish:
+    needs: [build_and_test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v1
+        with:
+          node-version: '16.x'
+          registry-url: 'https://registry.npmjs.org'
+      - run: yarn install
+      - run: yarn build
+      - run: yarn install --prod
+
+      - name: Extract git tag name
+        id: vars
+        run: echo ::set-output name=tag::${GITHUB_REF#refs/*/}
+      - name: Update package.json version based on a tag
+        run: |
+          node -e " \
+            const package =JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            package.version = '$RELEASE_VERSION'; \
+            fs.writeFileSync('package.json', JSON.stringify(package)); \
+          "
+        env:
+          RELEASE_VERSION: ${{ steps.vars.outputs.tag }}
+
+      - run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
