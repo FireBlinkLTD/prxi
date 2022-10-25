@@ -6,9 +6,6 @@ import { Configuration, ProxyRequestConfiguration } from "../interfaces";
 const emptyObj = {};
 
 export class RequestUtils {
-  private static readonly HOST_REGEX = /\w+:\/\/([^\/:]+).*/i;
-  private static readonly PORT_REGEX = /\w+:\/\/[^\/]+:(\d+).*/i;
-
   /**
    * Extract path from the request
    * @param req
@@ -30,13 +27,13 @@ export class RequestUtils {
    * @returns
    */
   public static getPort(target: string): number {
-    const match = target.match(RequestUtils.PORT_REGEX);
-    /* istanbul ignore else */
-    if (match) {
-      return Number(match[1]);
-    } else {
+    const hostWithPort = RequestUtils.extractHostWithPort(target);
+    const colonIdx = hostWithPort.indexOf(':');
+    if (colonIdx < 0) {
       return null;
     }
+
+    return Number(hostWithPort.substring(colonIdx + 1));
   }
 
   /**
@@ -45,10 +42,28 @@ export class RequestUtils {
    * @returns
    */
   public static getHost(target: string): string {
-    const match = target.match(RequestUtils.HOST_REGEX);
-    ok(match, `Unable to extract host from "${target}"`);
+    const hostWithPort = RequestUtils.extractHostWithPort(target);
+    const colonIdx = hostWithPort.indexOf(':');
+    if (colonIdx < 0) {
+      return hostWithPort;
+    }
 
-    return match[1];
+    return hostWithPort.substring(0, colonIdx);
+  }
+
+  /**
+   * Extract host (with port) from target
+   * @param target
+   * @returns
+   */
+  private static extractHostWithPort(target: string): string {
+    target = target.substring(target.indexOf('//') + 2);
+    const trailingSlashIdx = target.indexOf('/');
+    if (trailingSlashIdx > 0) {
+      target = target.substring(0, trailingSlashIdx);
+    }
+
+    return target;
   }
 
   /**

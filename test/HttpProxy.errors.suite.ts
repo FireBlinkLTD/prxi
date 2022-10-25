@@ -1,4 +1,4 @@
-import {suite, test} from 'mocha-typescript';
+import {suite, test} from '@testdeck/mocha';
 import { TestServer, TestProxy, assertReject, writeJson } from './helpers';
 import axios from 'axios';
 import {deepEqual, equal, strictEqual, match} from 'assert';
