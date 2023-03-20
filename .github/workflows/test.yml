@@ -19,15 +19,15 @@ jobs:
         with:
           languages: typescript
 
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v2
+
       - run: yarn install
       - run: yarn test
       - run: yarn test:coverage
 
       # send test coverage
       - run: bash <(curl -s https://codecov.io/bash) -f ./coverage/coverage.lcov
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v2
 
       - uses: actions/upload-artifact@v3
         with:
