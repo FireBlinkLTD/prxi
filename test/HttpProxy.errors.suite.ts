@@ -70,10 +70,23 @@ export class HttpProxyErrorSuite {
     }
 
     @test()
-    async noWebSocketHandler(): Promise<void> {
-      this.proxy = new TestProxy('localhost', null, true, false);
+    async noHandlers(): Promise<void> {
+      let msg = null;
+      this.proxy = new TestProxy('localhost', async (req: IncomingMessage, res: ServerResponse, err?: Error) => {
+        msg = err.message;
+        throw err;
+      }, null);
       await this.proxy.start();
 
+      const result = axios.post(`${this.proxyUrl}/missing`, { test: true });
+      await assertReject(result);
+      equal(msg, 'Missing RequestHandler configuration for the "POST:/missing" request');
+    }
+
+    @test()
+    async noWebSocketHandler(): Promise<void> {
+      this.proxy = new TestProxy('localhost', false, true, false);
+      await this.proxy.start();
       const sio = io(`http://localhost:${TestProxy.PORT}`, {
         transports: ['websocket'],
         reconnection: false,
@@ -106,14 +119,15 @@ export class HttpProxyErrorSuite {
       });
 
       const err = await assertReject(new Promise<void>((res, rej) => {
-        sio.on('connect_error', (err) => {
-          rej(err);
-        });
-
-        setTimeout(() => {
+        const t = setTimeout(() => {
           sio.disconnect();
           rej(new Error('Unable to connect to WS'));
         }, 2000);
+
+        sio.on('connect_error', (err) => {
+          clearTimeout(t);
+          rej(err);
+        });
       }));
 
       strictEqual(err.message, `websocket error`);

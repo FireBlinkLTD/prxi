@@ -3,6 +3,7 @@ import {request as httpRequest, RequestOptions} from 'http';
 import {request as httpsRequest} from 'https';
 
 import { Configuration, ProxyRequestConfiguration } from "../interfaces";
+import { UpstreamConfiguration } from "../interfaces/UpstreamConfiguration";
 import { RequestUtils } from "../utils";
 
 const emptyObj = {};
@@ -11,6 +12,7 @@ export class HttpProxyHandler {
   constructor(
     private logInfo: (msg: string) => void,
     private configuration: Configuration,
+    private upstream: UpstreamConfiguration,
   ) {}
 
   /**
@@ -29,7 +31,7 @@ export class HttpProxyHandler {
     // istanbul ignore next
     proxyConfiguration = proxyConfiguration || emptyObj;
 
-    let target = proxyConfiguration.target || this.configuration.target;
+    let target = proxyConfiguration.target || this.upstream.target;
     const url = proxyConfiguration.url || req.url;
     const httpsTarget = RequestUtils.isHttpsTarget(target);
     // istanbul ignore next
@@ -49,6 +51,7 @@ export class HttpProxyHandler {
       headers: RequestUtils.prepareProxyHeaders(
         req.headers,
         this.configuration.proxyRequestHeaders,
+        this.upstream.proxyRequestHeaders,
         // istanbul ignore next
         proxyConfiguration?.proxyRequestHeaders,
       ),
@@ -69,6 +72,7 @@ export class HttpProxyHandler {
         const headersToSet = RequestUtils.prepareProxyHeaders(
           response.headers,
           this.configuration.responseHeaders,
+          this.upstream.responseHeaders,
           // istanbul ignore next
           proxyConfiguration?.proxyResponseHeaders
         );

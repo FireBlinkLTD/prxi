@@ -1,2 +1,2 @@
 export * from './interfaces';
-export * from './FireProxy';
+export * from './Prxy';

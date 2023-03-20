@@ -1,14 +1,9 @@
 import { IncomingMessage, ServerResponse } from 'http';
-import { RequestHandler, WebSocketHandlerFunction } from './RequestHandler';
+import { UpstreamConfiguration } from './UpstreamConfiguration';
 
 export type ErrorHandler = (req: IncomingMessage, res: ServerResponse, err: Error) => Promise<void>;
 
 export interface Configuration {
-  /**
-   * Target host
-   */
-  target: string;
-
   /**
    * Host port
    */
@@ -28,17 +23,7 @@ export interface Configuration {
   /**
    * Request error handler
    */
-  errorHandler: ErrorHandler;
-
-  /**
-   * Request handlers
-   */
-  requestHandlers: Array<RequestHandler>;
-
-  /**
-   * WebSocket request handler
-   */
-  webSocketHandler?: WebSocketHandlerFunction;
+  errorHandler?: ErrorHandler;
 
   /**
    * Proxy request headers to add/replace/remove
@@ -49,6 +34,11 @@ export interface Configuration {
    * Proxy response headers to add/replace/remove
    */
   responseHeaders?: Record<string, string | string[] | null>;
+
+  /**
+   * Upstream configurations
+   */
+  upstream: UpstreamConfiguration[];
 
   /**
    * Info log handler

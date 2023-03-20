@@ -1,16 +1,16 @@
 import { IncomingMessage, ServerResponse } from 'http';
 import { Duplex } from 'stream';
-import { ErrorHandler, FireProxy, ProxyRequest, WebSocketHandlerFunction } from '../../src';
+import { ErrorHandler, Prxy, ProxyRequest, WebSocketHandlerFunction, WebSocketHandlerConfig } from '../../src';
 import { TestServer } from './TestServer';
 
 export class TestProxy {
   public static readonly PORT = 8888;
-  private proxy: FireProxy;
+  private proxy: Prxy;
 
   constructor(
     private host = 'localhost',
-    private customErrorHandler: ErrorHandler = null,
-    private isMatching = true,
+    private customErrorHandler: ErrorHandler | false = null,
+    private isMatching: boolean | null = true,
     private customWsHandler: WebSocketHandlerFunction | null | false = null,
   ) {}
 
@@ -18,18 +18,26 @@ export class TestProxy {
    * Start proxy server
    */
   public async start() {
+    const wsh = <WebSocketHandlerConfig> {
+      isMatching: () => true,
+      handle: this.customWsHandler ? this.customWsHandler : (this.customWsHandler !==false ? this.wsHandler.bind(this) : null),
+    };
+
     // instantiate
-    this.proxy = new FireProxy({
+    this.proxy = new Prxy({
       port: TestProxy.PORT,
-      target: `http://${this.host}:${TestServer.PORT}`,
-      errorHandler: this.customErrorHandler || this.errorHandler.bind(this),
-      requestHandlers: [
-        {
-          isMatching: () => this.isMatching,
-          handle: this.handleOthers.bind(this),
-        }
-      ],
-      webSocketHandler: this.customWsHandler ? this.customWsHandler : (this.customWsHandler !== false ? this.wsHandler.bind(this) : null),
+      upstream: [{
+        target: `http://${this.host}:${TestServer.PORT}`,
+        requestHandlers: this.isMatching !== null ? [
+          {
+            isMatching: () => this.isMatching,
+            handle: this.handleOthers.bind(this),
+          }
+        ] : null,
+        webSocketHandlers: wsh.handle ? [wsh] : null,
+      }],
+
+      errorHandler: this.customErrorHandler ? this.customErrorHandler : (this.customErrorHandler !== false ? this.errorHandler.bind(this) : null),
       logInfo: console.log,
       logError: console.error,
       proxyRequestHeaders: {

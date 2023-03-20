@@ -4,6 +4,7 @@ import {request as httpsRequest} from 'https';
 import { Socket } from "net";
 
 import { Configuration, ProxyRequestConfiguration } from "../interfaces";
+import { UpstreamConfiguration } from "../interfaces/UpstreamConfiguration";
 import { RequestUtils, WebSocketUtils } from "../utils";
 
 const emptyObj = {};
@@ -19,6 +20,7 @@ export class WebSocketProxyHandler {
     private logInfo: (msg: string) => void,
     private logError: (msg: string, err?: Error) => void,
     private configuration: Configuration,
+    private upstream: UpstreamConfiguration,
   ) {}
 
   public static readonly debug: DebugInterface = {}
@@ -43,7 +45,7 @@ export class WebSocketProxyHandler {
       proxyConfiguration = proxyConfiguration || emptyObj;
 
       // istanbul ignore next
-      let target = proxyConfiguration.target || this.configuration.target;
+      let target = proxyConfiguration.target || this.upstream.target;
       // istanbul ignore next
       const url = proxyConfiguration.url || req.url;
       const httpsTarget = RequestUtils.isHttpsTarget(target);
@@ -53,7 +55,7 @@ export class WebSocketProxyHandler {
       const port = proxyConfiguration.port || RequestUtils.getPort(target) || (httpsTarget ? 443 : 80);
       const host = RequestUtils.getHost(target);
 
-      this.logInfo(`[${requestId}] [WebSocketProxyHandler] Processing WebSocket proxy request with method to ${target}${url}`);
+      this.logInfo(`[${requestId}] [WebSocketProxyHandler] Processing WebSocket proxy request to ${target}${url}`);
 
       const options: RequestOptions = {
         method: 'GET',
@@ -63,6 +65,7 @@ export class WebSocketProxyHandler {
         headers: RequestUtils.prepareProxyHeaders(
           req.headers,
           this.configuration.proxyRequestHeaders,
+          this.upstream.proxyRequestHeaders,
           // istanbul ignore next
           proxyConfiguration?.proxyRequestHeaders,
         ),
@@ -101,7 +104,12 @@ export class WebSocketProxyHandler {
           if (!res.headers.upgrade) {
             this.logInfo(`[${requestId}] [WebSocketProxyHandler] Response doesn't have an UPGRADE header`);
 
-            const headersToSet = RequestUtils.prepareProxyHeaders(res.headers, this.configuration.responseHeaders, proxyConfiguration.proxyResponseHeaders);
+            const headersToSet = RequestUtils.prepareProxyHeaders(
+              res.headers,
+              this.configuration.responseHeaders,
+              this.upstream.proxyRequestHeaders,
+              proxyConfiguration.proxyResponseHeaders,
+            );
             socket.write(WebSocketUtils.prepareRawHeadersString(`HTTP/${res.httpVersion} ${res.statusCode} ${res.statusMessage}`, headersToSet));
             res.pipe(socket);
           }
@@ -147,7 +155,12 @@ export class WebSocketProxyHandler {
           // keep socket alive
           WebSocketUtils.keepAlive(proxySocket);
 
-          const headersToSet = RequestUtils.prepareProxyHeaders(proxyResponse.headers, this.configuration.responseHeaders, proxyConfiguration.proxyResponseHeaders);
+          const headersToSet = RequestUtils.prepareProxyHeaders(
+            proxyResponse.headers,
+            this.configuration.responseHeaders,
+            this.upstream.proxyRequestHeaders,
+            proxyConfiguration.proxyResponseHeaders,
+          );
           socket.write(WebSocketUtils.prepareRawHeadersString(`HTTP/${req.httpVersion} 101 Switching Protocols`, headersToSet));
           proxySocket.pipe(socket).pipe(proxySocket);
         });

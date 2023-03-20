@@ -100,47 +100,33 @@ export class RequestUtils {
    */
   public static prepareProxyHeaders(
     headers: IncomingHttpHeaders | OutgoingHttpHeaders,
-    headersToRewrite?: Record<string, string | string[]>,
-    additionalHeadersToRewrite?: Record<string, string | string[]>
+    ...headersToRewrite: Record<string, string | string[]>[]
   ): OutgoingHttpHeaders {
     const outgoing: OutgoingHttpHeaders = {};
-    // istanbul ignore next
-    headersToRewrite = headersToRewrite || emptyObj;
-    // istanbul ignore next
-    additionalHeadersToRewrite = additionalHeadersToRewrite || emptyObj;
+
+    // remove null elements from the array
+    headersToRewrite = headersToRewrite.filter(htr => !!htr);
 
     const headersKeys = Object.keys(headers);
-    const headersToRewriteKeys = Object.keys(headersToRewrite);
-    const additionalHeadersToRewriteKeys = Object.keys(additionalHeadersToRewrite);
-
     const finalKeys = new Set(headersKeys.map(k => k.toLowerCase()));
-    for (const key of headersToRewriteKeys) {
-      const lowerKey = key.toLowerCase();
-      if (headersToRewrite[key] !== null) {
-        finalKeys.add(lowerKey);
-      } else {
-        finalKeys.delete(lowerKey);
-      }
-    }
 
-    for (const key of additionalHeadersToRewriteKeys) {
-      const lowerKey = key.toLowerCase();
-      if (additionalHeadersToRewrite[key] !== null) {
-        finalKeys.add(lowerKey);
-      } else {
-        finalKeys.delete(lowerKey);
+    const rewriteHeaders: Record<string, string | string[]> = {};
+    headersToRewrite.forEach(htr => {
+      const headersToRewriteKeys = Object.keys(htr);
+      for (const key of headersToRewriteKeys) {
+        const lowerKey = key.toLowerCase();
+        if (htr[key] !== null) {
+          finalKeys.add(lowerKey);
+          rewriteHeaders[lowerKey] = htr[key];
+        } else {
+          finalKeys.delete(lowerKey);
+          delete rewriteHeaders[lowerKey];
+        }
       }
-    }
+    });
 
     for (const key of finalKeys) {
-      const rewriteHeaderKey = headersToRewriteKeys.find(k => k.toLowerCase() === key);
-      let rewriteHeader = rewriteHeaderKey && headersToRewrite[rewriteHeaderKey];
-
-      const additionalRewriteHeaderKey = additionalHeadersToRewriteKeys.find(k => k.toLowerCase() === key);
-      const additionalRewriteHeader = additionalRewriteHeaderKey && additionalHeadersToRewrite[additionalRewriteHeaderKey];
-      if (additionalRewriteHeader !== undefined) {
-        rewriteHeader = additionalRewriteHeader;
-      }
+      let rewriteHeader = rewriteHeaders[key];
 
       if (rewriteHeader !== undefined) {
         outgoing[key] = rewriteHeader;

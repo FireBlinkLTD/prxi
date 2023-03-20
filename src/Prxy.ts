@@ -1,0 +1,260 @@
+import { Configuration, HttpMethod, ProxyRequestConfiguration, RequestHandlerConfig, WebSocketHandlerConfig } from "./interfaces";
+import { createServer, IncomingMessage, ServerResponse, Server } from "http";
+import { Socket } from "net";
+import { RequestUtils, WebSocketUtils } from "./utils";
+import { HttpProxyHandler, WebSocketProxyHandler } from "./handlers";
+import { UpstreamConfiguration } from "./interfaces/UpstreamConfiguration";
+
+interface Proxy {
+  upstream: UpstreamConfiguration,
+  http: HttpProxyHandler,
+  ws: WebSocketProxyHandler,
+}
+
+export class Prxy {
+  private server: Server = null;
+  private logInfo: (message?: any, ...params: any[]) => void;
+  private logError: (message?: any, ...params: any[]) => void;
+
+  constructor(private configuration: Configuration) {
+    const {logInfo, logError} = this.configuration;
+    this.logInfo = (msg) => {
+      // istanbul ignore next
+      (logInfo || this.logInfo)(`[${new Date().toISOString()}] ${msg}`);
+    };
+
+    this.logError = (msg, err) => {
+      // istanbul ignore next
+      (logError || this.logError)(`[${new Date().toISOString()}] ${msg}`, err);
+    };
+  }
+
+  /**
+   * Start proxy server
+   */
+  public async start(): Promise<void> {
+    let {hostname, port, upstream: upstreamConfigurations, errorHandler} = this.configuration;
+    hostname = hostname || 'localhost';
+
+    // register default error handler
+    if (!errorHandler) {
+      /* istanbul ignore next */
+      errorHandler = (req: IncomingMessage, res: ServerResponse, err?: Error): Promise<void> => {
+        /* istanbul ignore next */
+        return new Promise<void>((res, rej) => rej(err));
+      }
+    }
+
+    const proxies = upstreamConfigurations.map(upstream => {
+      const httpProxyHandler = new HttpProxyHandler(
+        this.logInfo,
+        this.configuration,
+        upstream,
+      );
+
+      const webSocketProxyHandler = new WebSocketProxyHandler(
+        this.logInfo,
+        this.logError,
+        this.configuration,
+        upstream
+      );
+
+      return {
+        upstream,
+        http: httpProxyHandler,
+        ws: webSocketProxyHandler,
+      }
+    });
+
+    let id = 0;
+    // create server
+    const server = this.server = createServer((req: IncomingMessage, res: ServerResponse) => {
+      const requestId = id++;
+      const path = RequestUtils.getPath(req);
+
+      this.logInfo(`[${requestId}] [Prxy] Handling incoming request for method: ${req.method} and path: ${path}`);
+
+      const {handler, upstream, proxy} = Prxy.findRequestHandler(proxies, upstreamConfigurations, <HttpMethod> req.method, path);
+      if (handler) {
+        /* istanbul ignore next */
+        if (upstream.errorHandler) {
+          /* istanbul ignore next */
+          errorHandler = upstream.errorHandler;
+        }
+
+        const headersToSet = RequestUtils.prepareProxyHeaders(
+          res.getHeaders(),
+          this.configuration.responseHeaders,
+          upstream.responseHeaders,
+        );
+        RequestUtils.updateResponseHeaders(res, headersToSet);
+
+
+        handler.handle(
+          req,
+          res,
+          async (
+            proxyConfiguration?: ProxyRequestConfiguration,
+          ): Promise<void> => {
+            this.logInfo(`[${requestId}] [Prxy] Handling HTTP proxy request for path: ${path}`);
+            await proxy.http.proxy(requestId, req, res, proxyConfiguration);
+          }).catch((err) => {
+            this.logError(`[${requestId}] [Prxy] Error occurred upon making the "${req.method}:${path}" request`, err);
+            errorHandler(req, res, err).catch(err => {
+              this.logError(`[${requestId}] [Prxy] Unable to handle error with errorHandler`, err);
+              req.destroy();
+              res.destroy();
+            });
+          });
+      } else {
+        this.logError(`[${requestId}] [Prxy] Missing RequestHandler configuration for the "${req.method}:${path}" request`);
+        errorHandler(req, res, new Error(`Missing RequestHandler configuration for the "${req.method}:${path}" request`)).catch(err => {
+          this.logError(`[${requestId}] [Prxy] Unable to handle error with errorHandler`, err);
+          req.destroy();
+          res.destroy();
+        });
+      }
+    });
+
+    // handle upgrade action
+    server.on('upgrade', (req: IncomingMessage, socket: Socket, head: Buffer) => {
+      const requestId = id++;
+
+      const path = RequestUtils.getPath(req);
+      const {handler, proxy} = Prxy.findWebSocketHandler(proxies, upstreamConfigurations, path);
+
+      this.logInfo(`[${requestId}] [Prxy] Upgrade event received on path: ${path}`);
+      // handle websocket
+      if (
+        req.headers.upgrade.toLowerCase() === 'websocket'
+        && req.method.toUpperCase() === 'GET'
+        && handler
+      ) {
+        handler.handle(req, socket, head, async (proxyConfiguration?: ProxyRequestConfiguration): Promise<void> => {
+          this.logInfo(`[${requestId}] [Prxy] Handling WS proxy request for path: ${path}`);
+          await proxy.ws.proxy(requestId, req, socket, head, proxyConfiguration);
+        })
+        .catch(err => {
+          this.logError(`[${requestId}] [Prxy] Unable to handle websocket request`, err);
+
+          const headersToSet = RequestUtils.prepareProxyHeaders(
+            {},
+            this.configuration.responseHeaders,
+            proxy.upstream.responseHeaders,
+          );
+          socket.write(WebSocketUtils.prepareRawHeadersString(`HTTP/${req.httpVersion} 500 Unexpected error ocurred`, headersToSet));
+
+          // destroy socket cause we can't handle it
+          socket.destroy();
+        });
+      } else {
+        this.logInfo(`[${requestId}] [Prxy] Unable to handle upgrade request`);
+
+        const headersToSet = RequestUtils.prepareProxyHeaders(
+          {},
+          this.configuration.responseHeaders,
+        );
+        socket.write(WebSocketUtils.prepareRawHeadersString(`HTTP/${req.httpVersion} 405 Upgrade could not be processed`, headersToSet));
+
+        // destroy socket cause we can't handle it
+        socket.destroy();
+      }
+    });
+
+    // start listening on incoming connections
+    await new Promise<void>(res => {
+      server.listen(port, hostname, () => {
+        this.logInfo(`Prxy started listening on ${hostname}:${port}`);
+        res();
+      });
+    });
+  }
+
+  /**
+   * Find http request handler across all the configs
+   * @param proxies
+   * @param configs
+   * @param method
+   * @param path
+   * @returns
+   */
+  private static findRequestHandler(proxies: Proxy[], configs: UpstreamConfiguration[], method: HttpMethod, path: string): {
+    proxy: Proxy | null,
+    handler: RequestHandlerConfig | null,
+    upstream: UpstreamConfiguration | null,
+  } | null {
+    for (const upstream of configs) {
+      const handler = upstream.requestHandlers?.find(i => i.isMatching(method, path));
+      if (handler) {
+        const proxy = proxies.find(p => p.upstream === upstream);
+        return {
+          proxy,
+          handler,
+          upstream,
+        };
+      }
+    }
+
+    return {
+      proxy: null,
+      handler: null,
+      upstream: null,
+    };
+  }
+
+  /**
+   * Find WS handler across all the configs
+   * @param configs
+   * @param path
+   * @returns
+   */
+  private static findWebSocketHandler(proxies: Proxy[], configs: UpstreamConfiguration[], path: string): {
+    proxy: Proxy | null,
+    handler: WebSocketHandlerConfig | null,
+    upstream: UpstreamConfiguration | null,
+  } | null {
+    for (const upstream of configs) {
+      const handler = upstream.webSocketHandlers?.find(i => i.isMatching(path));
+      if (handler) {
+        const proxy = proxies.find(p => p.upstream === upstream);
+        return {
+          proxy,
+          handler,
+          upstream,
+        };
+      }
+    }
+
+    return {
+      proxy: null,
+      handler: null,
+      upstream: null,
+    };
+
+  }
+
+  /**
+   * Stop proxy service if running
+   */
+  public async stop(): Promise<void> {
+    /* istanbul ignore next */
+    if (this.server) {
+      await new Promise<void>((res, rej) => {
+        this.logInfo('Stopping Prxy');
+        this.server.close((err) => {
+          if (err) {
+            this.logError('Failed to stop Prxy', err);
+            return rej(err);
+          }
+
+          this.logInfo('Prxy stopped');
+          res();
+        });
+      });
+    } else {Prxy
+      this.logInfo('Prxy stopping skipped, not running');
+    }
+
+    this.server = null;
+  }
+}
