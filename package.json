@@ -5,7 +5,12 @@
   "main": "dist/index.js",
   "author": "Vladyslav Tkachenko <vlad@fireblink.com>",
   "license": "MIT",
-  "keywords": ["proxy", "reverse proxy", "http", "websocket"],
+  "keywords": [
+    "proxy",
+    "reverse proxy",
+    "http",
+    "websocket"
+  ],
   "scripts": {
     "build": "tsc",
     "test:clean": "rimraf ./coverage",
@@ -17,21 +22,19 @@
     "url": "git+https://github.com/FireBlinkLTD/prxy.git"
   },
   "devDependencies": {
-    "@testdeck/mocha": "^0.2.1",
-    "@types/mocha": "^10.0.0",
-    "@types/node": "^18.11.5",
-    "@types/socket.io": "^3.0.2",
-    "@types/socket.io-client": "^3.0.0",
-    "axios": "^0.27.2",
-    "mocha": "^10.1.0",
+    "@testdeck/mocha": "^0.3.3",
+    "@types/mocha": "^10.0.1",
+    "@types/node": "^18.15.3",
+    "axios": "^1.3.4",
+    "mocha": "^10.2.0",
     "mochawesome": "^7.1.3",
     "nyc": "^15.1.0",
-    "rimraf": "^3.0.2",
-    "socket.io": "^4.5.3",
-    "socket.io-client": "^4.5.3",
+    "rimraf": "^4.4.0",
+    "socket.io": "^4.6.1",
+    "socket.io-client": "^4.6.1",
     "source-map-support": "^0.5.21",
     "ts-node": "^10.9.1",
-    "typescript": "^4.8.4"
+    "typescript": "^5.0.2"
   },
   "nyc": {
     "cache": false,
