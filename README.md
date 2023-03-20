@@ -1,29 +1,29 @@
-# prxi
+# prxy
 
-[![Tests](https://github.com/FireBlinkLTD/prxi/actions/workflows/test.yml/badge.svg)](https://github.com/FireBlinkLTD/prxi/actions?query=workflow%3ATests)
-[![Known Vulnerabilities](https://snyk.io/test/github/FireBlinkLTD/prxi/badge.svg)](https://snyk.io/test/github/FireBlinkLTD/prxi)
-[![codecov](https://codecov.io/gh/FireBlinkLTD/prxi/branch/main/graph/badge.svg?token=jhx7jzSGnp)](https://codecov.io/gh/FireBlinkLTD/prxi)
+[![Tests](https://github.com/FireBlinkLTD/prxy/actions/workflows/test.yml/badge.svg)](https://github.com/FireBlinkLTD/prxy/actions?query=workflow%3ATests)
+[![Known Vulnerabilities](https://snyk.io/test/github/FireBlinkLTD/prxy/badge.svg)](https://snyk.io/test/github/FireBlinkLTD/prxy)
+[![codecov](https://codecov.io/gh/FireBlinkLTD/prxy/branch/main/graph/badge.svg?token=jhx7jzSGnp)](https://codecov.io/gh/FireBlinkLTD/prxy)
 
 
-prxi is a zero dependency reverse proxy module for Node.js
+prxy is a zero dependency reverse proxy module for Node.js
 
 # Installation
 
 ```bash
 # For NPM users:
-npm i prxi
+npm i prxy
 
 # For Yarn users:
-yarn add prxi
+yarn add prxy
 ```
 
 # Usage
 
 ```typescript
-import { Prxi, HttpMethod, ProxyRequest} from 'prxi';
+import { Prxy, HttpMethod, ProxyRequest} from 'prxy';
 
-// Instantiate new prxi, requires a src/Configuration.ts configuration object
-const proxy = new Prxi({
+// Instantiate new Prxy, requires a src/Configuration.ts configuration object
+const proxy = new Prxy({
   // port to listen incoming requests on
   port: TestProxy.PORT,
 
@@ -106,7 +106,7 @@ const requestHandlers = [
      * Request handler
      */
     handle: async (req: IncomingMesssage, res: ServerResponse, proxyRequest: ProxyRequest): Promise<void> => {
-      // proxy incomming request to the upstream
+      // proxy incoming request to the upstream
       // optionally pass ProxyRequestConfiguration object as a parameter
       await proxyRequest({
         // optionally provide alternative path for the upstream request
@@ -148,7 +148,7 @@ const webSocketHandlers = [
      * Request handler
      */
     handle: async (req: IncomingMessage, socket: Duplex, head: Buffer, handle: () => Promise<void>): Promise<void> => {
-      // proxy incomming request to the upstream
+      // proxy incoming request to the upstream
       // optionally pass ProxyRequestConfiguration object as a parameter
       await handle(
         // optionally provide alternative path for the upstream request
