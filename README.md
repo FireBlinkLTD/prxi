@@ -1,29 +1,29 @@
-# prxy
+# prxi
 
-[![Tests](https://github.com/FireBlinkLTD/prxy/actions/workflows/test.yml/badge.svg)](https://github.com/FireBlinkLTD/prxy/actions?query=workflow%3ATests)
-[![Known Vulnerabilities](https://snyk.io/test/github/FireBlinkLTD/prxy/badge.svg)](https://snyk.io/test/github/FireBlinkLTD/prxy)
-[![codecov](https://codecov.io/gh/FireBlinkLTD/prxy/branch/main/graph/badge.svg?token=jhx7jzSGnp)](https://codecov.io/gh/FireBlinkLTD/prxy)
+[![Tests](https://github.com/FireBlinkLTD/prxi/actions/workflows/test.yml/badge.svg)](https://github.com/FireBlinkLTD/prxi/actions?query=workflow%3ATests)
+[![Known Vulnerabilities](https://snyk.io/test/github/FireBlinkLTD/prxi/badge.svg)](https://snyk.io/test/github/FireBlinkLTD/prxi)
+[![codecov](https://codecov.io/gh/FireBlinkLTD/prxi/branch/main/graph/badge.svg?token=jhx7jzSGnp)](https://codecov.io/gh/FireBlinkLTD/prxi)
 
 
-prxy is a zero dependency reverse proxy module for Node.js
+prxi is a zero dependency reverse proxy module for Node.js
 
 # Installation
 
 ```bash
 # For NPM users:
-npm i prxy
+npm i prxi
 
 # For Yarn users:
-yarn add prxy
+yarn add prxi
 ```
 
 # Usage
 
 ```typescript
-import { Prxy, HttpMethod, ProxyRequest} from 'prxy';
+import { Prxi, HttpMethod, ProxyRequest} from 'prxi';
 
-// Instantiate new Prxy, requires a src/Configuration.ts configuration object
-const proxy = new Prxy({
+// Instantiate new Prxi, requires a src/Configuration.ts configuration object
+const proxy = new Prxi({
   // port to listen incoming requests on
   port: TestProxy.PORT,
 

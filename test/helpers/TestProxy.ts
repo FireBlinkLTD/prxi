@@ -1,11 +1,11 @@
 import { IncomingMessage, ServerResponse } from 'http';
 import { Duplex } from 'stream';
-import { ErrorHandler, Prxy, ProxyRequest, WebSocketHandlerFunction, WebSocketHandlerConfig } from '../../src';
+import { ErrorHandler, Prxi, ProxyRequest, WebSocketHandlerFunction, WebSocketHandlerConfig } from '../../src';
 import { TestServer } from './TestServer';
 
 export class TestProxy {
   public static readonly PORT = 8888;
-  private proxy: Prxy;
+  private proxy: Prxi;
 
   constructor(
     private host = 'localhost',
@@ -24,7 +24,7 @@ export class TestProxy {
     };
 
     // instantiate
-    this.proxy = new Prxy({
+    this.proxy = new Prxi({
       port: TestProxy.PORT,
       upstream: [{
         target: `http://${this.host}:${TestServer.PORT}`,

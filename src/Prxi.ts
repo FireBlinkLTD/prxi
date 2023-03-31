@@ -11,7 +11,7 @@ interface Proxy {
   ws: WebSocketProxyHandler,
 }
 
-export class Prxy {
+export class Prxi {
   private server: Server = null;
   private logInfo: (message?: any, ...params: any[]) => void;
   private logError: (message?: any, ...params: any[]) => void;
@@ -72,9 +72,9 @@ export class Prxy {
       const requestId = id++;
       const path = RequestUtils.getPath(req);
 
-      this.logInfo(`[${requestId}] [Prxy] Handling incoming request for method: ${req.method} and path: ${path}`);
+      this.logInfo(`[${requestId}] [Prxi] Handling incoming request for method: ${req.method} and path: ${path}`);
 
-      const {handler, upstream, proxy} = Prxy.findRequestHandler(proxies, upstreamConfigurations, <HttpMethod> req.method, path);
+      const {handler, upstream, proxy} = Prxi.findRequestHandler(proxies, upstreamConfigurations, <HttpMethod> req.method, path);
       if (handler) {
         /* istanbul ignore next */
         if (upstream.errorHandler) {
@@ -96,20 +96,20 @@ export class Prxy {
           async (
             proxyConfiguration?: ProxyRequestConfiguration,
           ): Promise<void> => {
-            this.logInfo(`[${requestId}] [Prxy] Handling HTTP proxy request for path: ${path}`);
+            this.logInfo(`[${requestId}] [Prxi] Handling HTTP proxy request for path: ${path}`);
             await proxy.http.proxy(requestId, req, res, proxyConfiguration);
           }).catch((err) => {
-            this.logError(`[${requestId}] [Prxy] Error occurred upon making the "${req.method}:${path}" request`, err);
+            this.logError(`[${requestId}] [Prxi] Error occurred upon making the "${req.method}:${path}" request`, err);
             errorHandler(req, res, err).catch(err => {
-              this.logError(`[${requestId}] [Prxy] Unable to handle error with errorHandler`, err);
+              this.logError(`[${requestId}] [Prxi] Unable to handle error with errorHandler`, err);
               req.destroy();
               res.destroy();
             });
           });
       } else {
-        this.logError(`[${requestId}] [Prxy] Missing RequestHandler configuration for the "${req.method}:${path}" request`);
+        this.logError(`[${requestId}] [Prxi] Missing RequestHandler configuration for the "${req.method}:${path}" request`);
         errorHandler(req, res, new Error(`Missing RequestHandler configuration for the "${req.method}:${path}" request`)).catch(err => {
-          this.logError(`[${requestId}] [Prxy] Unable to handle error with errorHandler`, err);
+          this.logError(`[${requestId}] [Prxi] Unable to handle error with errorHandler`, err);
           req.destroy();
           res.destroy();
         });
@@ -121,9 +121,9 @@ export class Prxy {
       const requestId = id++;
 
       const path = RequestUtils.getPath(req);
-      const {handler, proxy} = Prxy.findWebSocketHandler(proxies, upstreamConfigurations, path);
+      const {handler, proxy} = Prxi.findWebSocketHandler(proxies, upstreamConfigurations, path);
 
-      this.logInfo(`[${requestId}] [Prxy] Upgrade event received on path: ${path}`);
+      this.logInfo(`[${requestId}] [Prxi] Upgrade event received on path: ${path}`);
       // handle websocket
       if (
         req.headers.upgrade.toLowerCase() === 'websocket'
@@ -131,11 +131,11 @@ export class Prxy {
         && handler
       ) {
         handler.handle(req, socket, head, async (proxyConfiguration?: ProxyRequestConfiguration): Promise<void> => {
-          this.logInfo(`[${requestId}] [Prxy] Handling WS proxy request for path: ${path}`);
+          this.logInfo(`[${requestId}] [Prxi] Handling WS proxy request for path: ${path}`);
           await proxy.ws.proxy(requestId, req, socket, head, proxyConfiguration);
         })
         .catch(err => {
-          this.logError(`[${requestId}] [Prxy] Unable to handle websocket request`, err);
+          this.logError(`[${requestId}] [Prxi] Unable to handle websocket request`, err);
 
           const headersToSet = RequestUtils.prepareProxyHeaders(
             {},
@@ -148,7 +148,7 @@ export class Prxy {
           socket.destroy();
         });
       } else {
-        this.logInfo(`[${requestId}] [Prxy] Unable to handle upgrade request`);
+        this.logInfo(`[${requestId}] [Prxi] Unable to handle upgrade request`);
 
         const headersToSet = RequestUtils.prepareProxyHeaders(
           {},
@@ -164,7 +164,7 @@ export class Prxy {
     // start listening on incoming connections
     await new Promise<void>(res => {
       server.listen(port, hostname, () => {
-        this.logInfo(`Prxy started listening on ${hostname}:${port}`);
+        this.logInfo(`Prxi started listening on ${hostname}:${port}`);
         res();
       });
     });
@@ -240,19 +240,19 @@ export class Prxy {
     /* istanbul ignore next */
     if (this.server) {
       await new Promise<void>((res, rej) => {
-        this.logInfo('Stopping Prxy');
+        this.logInfo('Stopping Prxi');
         this.server.close((err) => {
           if (err) {
-            this.logError('Failed to stop Prxy', err);
+            this.logError('Failed to stop Prxi', err);
             return rej(err);
           }
 
-          this.logInfo('Prxy stopped');
+          this.logInfo('Prxi stopped');
           res();
         });
       });
-    } else {Prxy
-      this.logInfo('Prxy stopping skipped, not running');
+    } else {Prxi
+      this.logInfo('Prxi stopping skipped, not running');
     }
 
     this.server = null;

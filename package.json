@@ -1,5 +1,5 @@
 {
-  "name": "prxy",
+  "name": "prxi",
   "version": "0.0.1",
   "description": "Zero dependencies HTTP/WS proxy module",
   "main": "dist/index.js",
@@ -19,7 +19,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/FireBlinkLTD/prxy.git"
+    "url": "git+https://github.com/FireBlinkLTD/prxi.git"
   },
   "devDependencies": {
     "@testdeck/mocha": "^0.3.3",
