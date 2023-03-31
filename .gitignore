@@ -1,6 +1,7 @@
 *
 
 !/.gitignore
+!/.npmignore
 
 !/.github
 !/.github/**
