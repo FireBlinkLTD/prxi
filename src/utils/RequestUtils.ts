@@ -1,7 +1,4 @@
-import { ok } from "assert";
-import { OutgoingHttpHeaders, OutgoingMessage, IncomingMessage, IncomingHttpHeaders, ServerResponse } from "http";
-
-import { Configuration, ProxyRequestConfiguration } from "../interfaces";
+import { OutgoingHttpHeaders, OutgoingMessage, IncomingMessage, IncomingHttpHeaders } from "http";
 
 const emptyObj = {};
 
@@ -16,6 +13,19 @@ export class RequestUtils {
     const attributesIndex = path.indexOf('?');
     if (attributesIndex > 0) {
       path = path.substring(0, attributesIndex);
+    }
+
+    return path;
+  }
+
+  /**
+   * Concat path
+   * @param base
+   * @param path
+   */
+  public static concatPath(base: string, path: string): string {
+    if (base !== '/') {
+      return `${base}${path}`;
     }
 
     return path;

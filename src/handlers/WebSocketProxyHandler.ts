@@ -1,7 +1,7 @@
-import { ClientRequest, IncomingMessage } from "http";
-import {request as httpRequest, RequestOptions} from 'http';
-import {request as httpsRequest} from 'https';
-import { Socket } from "net";
+import { ClientRequest, IncomingMessage } from "node:http";
+import {request as httpRequest, RequestOptions} from 'node:http';
+import {request as httpsRequest} from 'node:https';
+import { Socket } from "node:net";
 
 import { Configuration, ProxyRequestConfiguration } from "../interfaces";
 import { UpstreamConfiguration } from "../interfaces/UpstreamConfiguration";
@@ -54,6 +54,7 @@ export class WebSocketProxyHandler {
       // istanbul ignore next
       const port = proxyConfiguration.port || RequestUtils.getPort(target) || (httpsTarget ? 443 : 80);
       const host = RequestUtils.getHost(target);
+      const initialPath = new URL(target).pathname;
 
       this.logInfo(`[${requestId}] [WebSocketProxyHandler] Processing WebSocket proxy request to ${target}${url}`);
 
@@ -69,7 +70,7 @@ export class WebSocketProxyHandler {
           // istanbul ignore next
           proxyConfiguration?.proxyRequestHeaders,
         ),
-        path: url,
+        path: RequestUtils.concatPath(initialPath, url),
         timeout: this.configuration.proxyRequestTimeout || 60 * 1000,
       };
 

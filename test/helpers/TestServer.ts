@@ -2,15 +2,14 @@ import { createServer, IncomingMessage, Server, ServerResponse } from 'http';
 import { parse as urlParse } from 'url';
 import { parse as queryParse } from 'querystring';
 import { writeJson } from './ResponseHelper';
-import  { Server as SocketIOServer, Socket } from 'socket.io';
+import  { Server as SocketIOServer } from 'socket.io';
 
 export class TestServer {
   public static readonly PORT = 7777;
   private server: Server;
   private socketIO: SocketIOServer;
 
-  constructor(private wsEnabled: boolean) {
-
+  constructor(private wsEnabled: boolean, private prefix: string = '') {
   }
 
   /**
@@ -19,15 +18,15 @@ export class TestServer {
   public async start() {
     await new Promise<void>((resolve) => {
       this.server = createServer((req: IncomingMessage, res: ServerResponse) => {
-        if (req.url === '/echo') {
+        if (req.url === `${this.prefix}/echo`) {
           return this.handleEcho(req, res);
         }
 
-        if (req.url.indexOf('/query') === 0) {
+        if (req.url.indexOf(`${this.prefix}/query`) === 0) {
           return this.handleQuery(req, res);
         }
 
-        if (req.url.indexOf('/headers') === 0) {
+        if (req.url.indexOf(`${this.prefix}/headers`) === 0) {
           return this.handleHeaders(req, res);
         }
 
@@ -39,7 +38,9 @@ export class TestServer {
 
       if (this.wsEnabled) {
         // add socket.io
-        this.socketIO = new SocketIOServer(this.server);
+        this.socketIO = new SocketIOServer(this.server, {
+          path: `${this.prefix}/socket.io`
+        });
         this.socketIO.on('connection', (socket) => {
           socket.on('echo', (msg) => {
             console.log(`Socket.IO "echo" message received: ${msg}`);

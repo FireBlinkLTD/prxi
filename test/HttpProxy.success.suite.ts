@@ -55,6 +55,26 @@ export class HttpProxySuccessSuite {
     }
 
     @test()
+    async customPath(): Promise<void> {
+      await this.after();
+      this.server = new TestServer(true, '/api');
+      this.proxy = new TestProxy('localhost', null, true, null, '/api');
+      await this.proxy.start();
+
+      await this.server.start();
+
+      const testData = [];
+      for (let i = 0; i < 1000 * 1000; i++) {
+        testData.push('Iteration - ' + i);
+      }
+
+      const result = await axios.post(`${this.proxyUrl}/echo`, testData, {
+        maxBodyLength: 50 * 1024 * 1024, // 50 mb
+      });
+      deepEqual(result.data, testData);
+    }
+
+    @test()
     async queryRequest(): Promise<void> {
       await this.initProxy();
 

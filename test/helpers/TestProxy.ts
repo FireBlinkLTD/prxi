@@ -12,6 +12,7 @@ export class TestProxy {
     private customErrorHandler: ErrorHandler | false = null,
     private isMatching: boolean | null = true,
     private customWsHandler: WebSocketHandlerFunction | null | false = null,
+    private prefix: string = '',
   ) {}
 
   /**
@@ -27,7 +28,7 @@ export class TestProxy {
     this.proxy = new Prxi({
       port: TestProxy.PORT,
       upstream: [{
-        target: `http://${this.host}:${TestServer.PORT}`,
+        target: `http://${this.host}:${TestServer.PORT}${this.prefix}`,
         requestHandlers: this.isMatching !== null ? [
           {
             isMatching: () => this.isMatching,

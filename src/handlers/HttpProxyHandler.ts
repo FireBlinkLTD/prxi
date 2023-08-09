@@ -1,10 +1,11 @@
-import { IncomingMessage, ServerResponse } from "http";
-import {request as httpRequest, RequestOptions} from 'http';
-import {request as httpsRequest} from 'https';
+import { IncomingMessage, ServerResponse } from "node:http";
+import {request as httpRequest, RequestOptions} from 'node:http';
+import {request as httpsRequest} from 'node:https';
 
 import { Configuration, ProxyRequestConfiguration } from "../interfaces";
 import { UpstreamConfiguration } from "../interfaces/UpstreamConfiguration";
 import { RequestUtils } from "../utils";
+
 
 const emptyObj = {};
 
@@ -39,6 +40,7 @@ export class HttpProxyHandler {
     // istanbul ignore next
     const port = proxyConfiguration.port || RequestUtils.getPort(target) || (httpsTarget ? 443 : 80);
     const host = RequestUtils.getHost(target);
+    const initialPath = new URL(target).pathname;
     const method = proxyConfiguration.method || req.method;
 
     this.logInfo(`[${requestId}] [HttpProxyHandler] Processing HTTP/HTTPS proxy request with method ${method} to ${target}${url}`);
@@ -55,7 +57,7 @@ export class HttpProxyHandler {
         // istanbul ignore next
         proxyConfiguration?.proxyRequestHeaders,
       ),
-      path: url,
+      path: RequestUtils.concatPath(initialPath, url),
       timeout: this.configuration.proxyRequestTimeout || 60 * 1000,
     };
 
