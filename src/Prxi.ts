@@ -98,7 +98,7 @@ export class Prxi {
           ): Promise<void> => {
             this.logInfo(`[${requestId}] [Prxi] Handling HTTP proxy request for path: ${path}`);
             await proxy.http.proxy(requestId, req, res, proxyConfiguration);
-          }).catch((err) => {
+          }, path).catch((err) => {
             this.logError(`[${requestId}] [Prxi] Error occurred upon making the "${req.method}:${path}" request`, err);
             errorHandler(req, res, err).catch(err => {
               this.logError(`[${requestId}] [Prxi] Unable to handle error with errorHandler`, err);
@@ -133,7 +133,7 @@ export class Prxi {
         handler.handle(req, socket, head, async (proxyConfiguration?: ProxyRequestConfiguration): Promise<void> => {
           this.logInfo(`[${requestId}] [Prxi] Handling WS proxy request for path: ${path}`);
           await proxy.ws.proxy(requestId, req, socket, head, proxyConfiguration);
-        })
+        }, path)
         .catch(err => {
           this.logError(`[${requestId}] [Prxi] Unable to handle websocket request`, err);
 
@@ -251,7 +251,7 @@ export class Prxi {
           res();
         });
       });
-    } else {Prxi
+    } else {
       this.logInfo('Prxi stopping skipped, not running');
     }
 

@@ -10,6 +10,7 @@ export type HandleFunction = (
   req: IncomingMessage,
   res: ServerResponse,
   proxyRequest: ProxyRequest,
+  path: string
 ) => Promise<void>;
 
 export type WebSocketHandlerFunction = (
@@ -17,6 +18,7 @@ export type WebSocketHandlerFunction = (
   socket: Socket,
   head: Buffer,
   proxyRequest: ProxyRequest,
+  path: string
 ) => Promise<void>;
 
 export interface WebSocketHandlerConfig {
