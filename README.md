@@ -100,12 +100,19 @@ const requestHandlers = [
   {
     // function to test the incoming request
     // if returns true `handle` function will process the request
-    isMatching: (method: HttpMethod, path: string): boolean => true,
+    isMatching: (method: HttpMethod, path: string, context: Record<string, any>): boolean => true,
 
     /**
      * Request handler
      */
-    handle: async (req: IncomingMesssage, res: ServerResponse, proxyRequest: ProxyRequest): Promise<void> => {
+    handle: async (
+      req: IncomingMesssage,
+      res: ServerResponse,
+      proxyRequest: ProxyRequest,
+      method: HttpMethod,
+      path: string,
+      context: Record<string, any>
+    ): Promise<void> => {
       // proxy incoming request to the upstream
       // optionally pass ProxyRequestConfiguration object as a parameter
       await proxyRequest({
@@ -142,15 +149,22 @@ const webSocketHandlers = [
   {
     // function to test the incoming request
     // if returns true `handle` function will process the request
-    isMatching: (path: string): boolean => true,
+    isMatching: (path: string, context: Record<string, any>): boolean => true,
 
     /**
      * Request handler
      */
-    handle: async (req: IncomingMessage, socket: Duplex, head: Buffer, handle: () => Promise<void>): Promise<void> => {
+    handle: async (
+      req: IncomingMessage,
+      socket: Socket,
+      head: Buffer,
+      proxyRequest: ProxyRequest,
+      path: string,
+      context: Record<string, any>
+    ): Promise<void> => {
       // proxy incoming request to the upstream
       // optionally pass ProxyRequestConfiguration object as a parameter
-      await handle(
+      await proxyRequest(
         // optionally provide alternative path for the upstream request
         url: '/another/path',
 

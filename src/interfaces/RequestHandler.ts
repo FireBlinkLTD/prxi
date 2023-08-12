@@ -3,14 +3,16 @@ import { Socket } from 'net';
 import { ProxyRequestConfiguration } from './ProxyRequestConfiguration';
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'OPTIONS' | 'HEAD';
-export type IsMatchingRequestFunction = (method: HttpMethod, path: string) => boolean;
-export type IsMatchingWebSocketFunction = (path: string) => boolean;
+export type IsMatchingRequestFunction = (method: HttpMethod, path: string, context: Record<string, any>) => boolean;
+export type IsMatchingWebSocketFunction = (path: string, context: Record<string, any>) => boolean;
 export type ProxyRequest = (configuration?: ProxyRequestConfiguration) => Promise<void>;
 export type HandleFunction = (
   req: IncomingMessage,
   res: ServerResponse,
   proxyRequest: ProxyRequest,
-  path: string
+  method: HttpMethod,
+  path: string,
+  context: Record<string, any>
 ) => Promise<void>;
 
 export type WebSocketHandlerFunction = (
@@ -18,7 +20,8 @@ export type WebSocketHandlerFunction = (
   socket: Socket,
   head: Buffer,
   proxyRequest: ProxyRequest,
-  path: string
+  path: string,
+  context: Record<string, any>
 ) => Promise<void>;
 
 export interface WebSocketHandlerConfig {
