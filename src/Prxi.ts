@@ -13,6 +13,7 @@ interface Proxy {
 
 export class Prxi {
   private server: Server = null;
+  private connections = new Set<Socket>();
   private logInfo: (message?: any, ...params: any[]) => void;
   private logError: (message?: any, ...params: any[]) => void;
 
@@ -113,6 +114,14 @@ export class Prxi {
           res.destroy();
         });
       }
+    });
+
+    // keep track of all open connections
+    server.on('connection', (connection: Socket) => {
+      this.connections.add(connection);
+      connection.on('close', () => {
+        this.connections.delete(connection);
+      });
     });
 
     // handle upgrade action
@@ -246,8 +255,21 @@ export class Prxi {
     /* istanbul ignore next */
     if (this.server) {
       await new Promise<void>((res, rej) => {
+        const timer = setTimeout(() => {
+          this.connections.forEach((connection: Socket) => {
+            try {
+              connection.destroy();
+            } catch (e) {
+              this.logError('Failed to destroy connection', e);
+            }
+          });
+        }, this.configuration.proxyRequestTimeout ?? 60 * 1000);
+
         this.logInfo('Stopping Prxi');
+
         this.server.close((err) => {
+          clearTimeout(timer);
+
           if (err) {
             this.logError('Failed to stop Prxi', err);
             return rej(err);

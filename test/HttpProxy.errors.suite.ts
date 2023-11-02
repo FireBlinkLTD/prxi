@@ -33,7 +33,7 @@ export class HttpProxyErrorSuite {
 
     @test()
     async addressNotFoundFailErrorHandler(): Promise<void> {
-      this.proxy = new TestProxy('non-existing-host');
+      this.proxy = new TestProxy({}, 'non-existing-host');
       await this.proxy.start();
 
       const result = axios.post(`${this.proxyUrl}/echo`, { test: true });
@@ -44,7 +44,7 @@ export class HttpProxyErrorSuite {
     @test()
     async addressNotFoundPassErrorHandler(): Promise<void> {
       const customError = 'Custom Error';
-      this.proxy = new TestProxy('non-existing-host', async (req: IncomingMessage, res: ServerResponse, err: Error): Promise<void> => {
+      this.proxy = new TestProxy({}, 'non-existing-host', async (req: IncomingMessage, res: ServerResponse, err: Error): Promise<void> => {
         match(err.message, /getaddrinfo .* non-existing-host/gi);
 
         await writeJson(res, JSON.stringify({customError}));
@@ -58,7 +58,7 @@ export class HttpProxyErrorSuite {
     @test()
     async missingHandler(): Promise<void> {
       let msg = null;
-      this.proxy = new TestProxy('localhost', async (req: IncomingMessage, res: ServerResponse, err?: Error) => {
+      this.proxy = new TestProxy({}, 'localhost', async (req: IncomingMessage, res: ServerResponse, err?: Error) => {
         msg = err.message;
         throw err;
       }, false);
@@ -72,7 +72,7 @@ export class HttpProxyErrorSuite {
     @test()
     async noHandlers(): Promise<void> {
       let msg = null;
-      this.proxy = new TestProxy('localhost', async (req: IncomingMessage, res: ServerResponse, err?: Error) => {
+      this.proxy = new TestProxy({}, 'localhost', async (req: IncomingMessage, res: ServerResponse, err?: Error) => {
         msg = err.message;
         throw err;
       }, null);
@@ -85,7 +85,7 @@ export class HttpProxyErrorSuite {
 
     @test()
     async noWebSocketHandler(): Promise<void> {
-      this.proxy = new TestProxy('localhost', false, true, false);
+      this.proxy = new TestProxy({}, 'localhost', false, true, false);
       await this.proxy.start();
       const sio = io(`http://localhost:${TestProxy.PORT}`, {
         transports: ['websocket'],
@@ -108,7 +108,7 @@ export class HttpProxyErrorSuite {
 
     @test()
     async failedWebSocketHandler(): Promise<void> {
-      this.proxy = new TestProxy('localhost', null, true, async () => {
+      this.proxy = new TestProxy({}, 'localhost', null, true, async () => {
         throw new Error('test');
       });
       await this.proxy.start();

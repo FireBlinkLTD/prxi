@@ -3,6 +3,7 @@ import { TestServer, TestProxy } from './helpers';
 import axios from 'axios';
 import {deepEqual, strictEqual} from 'assert';
 import {io} from 'socket.io-client';
+import { Configuration } from '../src';
 
 @suite()
 export class HttpProxySuccessSuite {
@@ -34,8 +35,8 @@ export class HttpProxySuccessSuite {
     /**
      * Init proxy server
      */
-    private async initProxy(): Promise<void> {
-      this.proxy = new TestProxy();
+    private async initProxy(configOverride: Partial<Configuration> = {}): Promise<void> {
+      this.proxy = new TestProxy(configOverride);
       await this.proxy.start();
     }
 
@@ -58,7 +59,7 @@ export class HttpProxySuccessSuite {
     async customPath(): Promise<void> {
       await this.after();
       this.server = new TestServer(true, '/api');
-      this.proxy = new TestProxy('localhost', null, true, null, '/api');
+      this.proxy = new TestProxy({}, 'localhost', null, true, null, '/api');
       await this.proxy.start();
 
       await this.server.start();
@@ -84,6 +85,23 @@ export class HttpProxySuccessSuite {
           test: '1',
         }
       });
+    }
+
+    @test()
+    async destroyRequestDueToTimeoutSettings(): Promise<void> {
+      await this.initProxy({
+        proxyRequestTimeout: 0,
+      });
+
+      let err;
+      try {
+        const resp = await axios.get(`${this.proxyUrl}/headers`);
+        console.log(resp);
+      } catch (e) {
+        err = e;
+      }
+
+      strictEqual(err.message, 'socket hang up');
     }
 
     @test()
@@ -129,6 +147,35 @@ export class HttpProxySuccessSuite {
         resproxylevelclear: undefined,
         ['res-test']: 'test-res',
       });
+    }
+
+    @test()
+    async destroyWebsocketRequestDueToTimeoutSettings(): Promise<void> {
+      await this.initProxy({
+        proxyRequestTimeout: 0,
+      });
+
+      const sio = io(`http://localhost:${TestProxy.PORT}`, {
+        transports: ['websocket'],
+        reconnection: false,
+      });
+
+      let err: Error;
+      await new Promise<void>((res, rej) => {
+        const timeout = setTimeout(() => {
+          sio.disconnect();
+          rej(new Error('Unable to connect to WS'));
+        }, 2000);
+
+        sio.on('connect_error', (e) => {
+          err = e;
+          sio.disconnect();
+          clearTimeout(timeout);
+          res();
+        });
+      });
+
+      strictEqual(err.message, 'websocket error');
     }
 
     @test()

@@ -5,7 +5,7 @@ import { Socket } from "node:net";
 
 import { Configuration, ProxyRequestConfiguration } from "../interfaces";
 import { UpstreamConfiguration } from "../interfaces/UpstreamConfiguration";
-import { RequestUtils, WebSocketUtils } from "../utils";
+import { RequestUtils, Timer, WebSocketUtils } from "../utils";
 
 const emptyObj = {};
 
@@ -40,6 +40,13 @@ export class WebSocketProxyHandler {
     head: Buffer,
     proxyConfiguration?: ProxyRequestConfiguration,
   ): Promise<void> {
+    const proxyRequestTimeout = this.configuration.proxyRequestTimeout ?? 60 * 1000;
+
+     // setup timer to force incoming request to be destroyed after 2x of proxyRequestTimeout configuration setting
+     const timer = new Timer(() => {
+      req.destroy();
+    }, proxyRequestTimeout * 2);
+
     try {
       WebSocketProxyHandler.debug.incomingSocket = socket;
       proxyConfiguration = proxyConfiguration || emptyObj;
@@ -71,7 +78,7 @@ export class WebSocketProxyHandler {
           proxyConfiguration?.proxyRequestHeaders,
         ),
         path: RequestUtils.concatPath(initialPath, url),
-        timeout: this.configuration.proxyRequestTimeout || 60 * 1000,
+        timeout: proxyRequestTimeout,
       };
 
       const client = request(options);
@@ -82,9 +89,6 @@ export class WebSocketProxyHandler {
       if (head && head.length) {
         socket.unshift(head);
       }
-
-      // keep socket alive
-      WebSocketUtils.keepAlive(socket);
 
       await new Promise<void>((resolve, reject) => {
         req.pipe(client);
@@ -153,7 +157,9 @@ export class WebSocketProxyHandler {
             reject(err);
           });
 
-          // keep socket alive
+          // keep sockets alive
+          timer.cancel();
+          WebSocketUtils.keepAlive(socket);
           WebSocketUtils.keepAlive(proxySocket);
 
           const headersToSet = RequestUtils.prepareProxyHeaders(
@@ -167,6 +173,7 @@ export class WebSocketProxyHandler {
         });
       });
     } finally {
+      timer.cancel();
       delete WebSocketProxyHandler.debug.incomingSocket;
       delete WebSocketProxyHandler.debug.upstreamSocket;
       delete WebSocketProxyHandler.debug.upstreamRequest;

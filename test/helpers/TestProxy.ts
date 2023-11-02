@@ -1,6 +1,6 @@
 import { IncomingMessage, ServerResponse } from 'http';
 import { Duplex } from 'stream';
-import { ErrorHandler, Prxi, ProxyRequest, WebSocketHandlerFunction, WebSocketHandlerConfig } from '../../src';
+import { ErrorHandler, Prxi, ProxyRequest, WebSocketHandlerFunction, WebSocketHandlerConfig, Configuration } from '../../src';
 import { TestServer } from './TestServer';
 
 export class TestProxy {
@@ -8,6 +8,7 @@ export class TestProxy {
   private proxy: Prxi;
 
   constructor(
+    private configOverride: Partial<Configuration> = {},
     private host = 'localhost',
     private customErrorHandler: ErrorHandler | false = null,
     private isMatching: boolean | null = true,
@@ -51,6 +52,8 @@ export class TestProxy {
         ResConfigLevelOverwrite: 'CONFIG-RESPONSE-OVERWRITE',
         ResConfigLevelClear: null,
       },
+
+      ...this.configOverride
     });
 
     // start it
