@@ -13,11 +13,14 @@ interface Proxy {
 
 export class Prxi {
   private server: Server = null;
-  private connections = new Set<Socket>();
   private logInfo: (message?: any, ...params: any[]) => void;
   private logError: (message?: any, ...params: any[]) => void;
 
   constructor(private configuration: Configuration) {
+    // set default values
+    /* istanbul ignore next */
+    configuration.proxyRequestTimeout = configuration.proxyRequestTimeout ?? 60 * 1000;
+
     const {logInfo, logError} = this.configuration;
     this.logInfo = (msg) => {
       // istanbul ignore next
@@ -69,7 +72,7 @@ export class Prxi {
 
     let id = 0;
     // create server
-    const server = this.server = createServer((req: IncomingMessage, res: ServerResponse) => {
+    const server = createServer((req: IncomingMessage, res: ServerResponse) => {
       const requestId = id++;
       const path = RequestUtils.getPath(req);
 
@@ -118,10 +121,7 @@ export class Prxi {
 
     // keep track of all open connections
     server.on('connection', (connection: Socket) => {
-      this.connections.add(connection);
-      connection.on('close', () => {
-        this.connections.delete(connection);
-      });
+      connection.setTimeout(this.configuration.proxyRequestTimeout);
     });
 
     // handle upgrade action
@@ -172,6 +172,7 @@ export class Prxi {
     // start listening on incoming connections
     await new Promise<void>(res => {
       server.listen(port, hostname, () => {
+        this.server = server;
         this.logInfo(`Prxi started listening on ${hostname}:${port}`);
         res();
       });
@@ -252,24 +253,14 @@ export class Prxi {
    * Stop proxy service if running
    */
   public async stop(): Promise<void> {
-    /* istanbul ignore next */
-    if (this.server) {
-      await new Promise<void>((res, rej) => {
-        const timer = setTimeout(() => {
-          this.connections.forEach((connection: Socket) => {
-            try {
-              connection.destroy();
-            } catch (e) {
-              this.logError('Failed to destroy connection', e);
-            }
-          });
-        }, this.configuration.proxyRequestTimeout ?? 60 * 1000);
+    const server = this.server;
 
+    /* istanbul ignore next */
+    if (server) {
+      await new Promise<void>((res, rej) => {
         this.logInfo('Stopping Prxi');
 
-        this.server.close((err) => {
-          clearTimeout(timer);
-
+        server.close((err) => {
           if (err) {
             this.logError('Failed to stop Prxi', err);
             return rej(err);

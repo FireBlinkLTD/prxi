@@ -88,23 +88,6 @@ export class HttpProxySuccessSuite {
     }
 
     @test()
-    async destroyRequestDueToTimeoutSettings(): Promise<void> {
-      await this.initProxy({
-        proxyRequestTimeout: 0,
-      });
-
-      let err;
-      try {
-        const resp = await axios.get(`${this.proxyUrl}/headers`);
-        console.log(resp);
-      } catch (e) {
-        err = e;
-      }
-
-      strictEqual(err.message, 'socket hang up');
-    }
-
-    @test()
     async headersRequest(): Promise<void> {
       await this.initProxy();
 
@@ -147,35 +130,6 @@ export class HttpProxySuccessSuite {
         resproxylevelclear: undefined,
         ['res-test']: 'test-res',
       });
-    }
-
-    @test()
-    async destroyWebsocketRequestDueToTimeoutSettings(): Promise<void> {
-      await this.initProxy({
-        proxyRequestTimeout: 0,
-      });
-
-      const sio = io(`http://localhost:${TestProxy.PORT}`, {
-        transports: ['websocket'],
-        reconnection: false,
-      });
-
-      let err: Error;
-      await new Promise<void>((res, rej) => {
-        const timeout = setTimeout(() => {
-          sio.disconnect();
-          rej(new Error('Unable to connect to WS'));
-        }, 2000);
-
-        sio.on('connect_error', (e) => {
-          err = e;
-          sio.disconnect();
-          clearTimeout(timeout);
-          res();
-        });
-      });
-
-      strictEqual(err.message, 'websocket error');
     }
 
     @test()

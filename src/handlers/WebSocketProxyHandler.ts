@@ -5,7 +5,7 @@ import { Socket } from "node:net";
 
 import { Configuration, ProxyRequestConfiguration } from "../interfaces";
 import { UpstreamConfiguration } from "../interfaces/UpstreamConfiguration";
-import { RequestUtils, Timer, WebSocketUtils } from "../utils";
+import { RequestUtils, WebSocketUtils } from "../utils";
 
 const emptyObj = {};
 
@@ -40,13 +40,6 @@ export class WebSocketProxyHandler {
     head: Buffer,
     proxyConfiguration?: ProxyRequestConfiguration,
   ): Promise<void> {
-    const proxyRequestTimeout = this.configuration.proxyRequestTimeout ?? 60 * 1000;
-
-     // setup timer to force incoming request to be destroyed after 2x of proxyRequestTimeout configuration setting
-     const timer = new Timer(() => {
-      req.destroy();
-    }, proxyRequestTimeout * 2);
-
     try {
       WebSocketProxyHandler.debug.incomingSocket = socket;
       proxyConfiguration = proxyConfiguration || emptyObj;
@@ -78,7 +71,7 @@ export class WebSocketProxyHandler {
           proxyConfiguration?.proxyRequestHeaders,
         ),
         path: RequestUtils.concatPath(initialPath, url),
-        timeout: proxyRequestTimeout,
+        timeout: this.configuration.proxyRequestTimeout,
       };
 
       const client = request(options);
@@ -158,7 +151,6 @@ export class WebSocketProxyHandler {
           });
 
           // keep sockets alive
-          timer.cancel();
           WebSocketUtils.keepAlive(socket);
           WebSocketUtils.keepAlive(proxySocket);
 
@@ -173,7 +165,6 @@ export class WebSocketProxyHandler {
         });
       });
     } finally {
-      timer.cancel();
       delete WebSocketProxyHandler.debug.incomingSocket;
       delete WebSocketProxyHandler.debug.upstreamSocket;
       delete WebSocketProxyHandler.debug.upstreamRequest;
