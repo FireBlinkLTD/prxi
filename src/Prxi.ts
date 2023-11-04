@@ -257,6 +257,7 @@ export class Prxi {
 
     /* istanbul ignore next */
     if (server) {
+      this.server = null;
       await new Promise<void>((res, rej) => {
         this.logInfo('Stopping Prxi');
 
@@ -273,7 +274,5 @@ export class Prxi {
     } else {
       this.logInfo('Prxi stopping skipped, not running');
     }
-
-    this.server = null;
   }
 }

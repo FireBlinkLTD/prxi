@@ -32,6 +32,15 @@ export class HttpProxyErrorSuite {
     }
 
     @test()
+    async doubleProxyStop() {
+      this.proxy = new TestProxy();
+      await this.proxy.start();
+
+      await this.proxy.stop();
+      await this.proxy.stop();
+    }
+
+    @test()
     async addressNotFoundFailErrorHandler(): Promise<void> {
       this.proxy = new TestProxy({}, 'non-existing-host');
       await this.proxy.start();
