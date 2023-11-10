@@ -159,6 +159,7 @@ const webSocketHandlers = [
       socket: Socket,
       head: Buffer,
       proxyRequest: ProxyRequest,
+      cancelRequest: WebSocketProxyCancelRequest,
       path: string,
       context: Record<string, any>
     ): Promise<void> => {
@@ -189,6 +190,9 @@ const webSocketHandlers = [
           'X-REMOVE_FROM_RESPONSE': null,
         },
       );
+
+      // alternatively cancel request with custom http status code and message
+      cancelRequest(418, 'I\'m a teapot');
     }
   }
 ]
