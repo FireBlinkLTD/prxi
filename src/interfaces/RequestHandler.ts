@@ -6,6 +6,7 @@ export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'OPTIONS'
 export type IsMatchingRequestFunction = (method: HttpMethod, path: string, context: Record<string, any>) => boolean;
 export type IsMatchingWebSocketFunction = (path: string, context: Record<string, any>) => boolean;
 export type ProxyRequest = (configuration?: ProxyRequestConfiguration) => Promise<void>;
+export type WebSocketProxyCancelRequest = (status: number, description: string) => void;
 export type HandleFunction = (
   req: IncomingMessage,
   res: ServerResponse,
@@ -20,6 +21,7 @@ export type WebSocketHandlerFunction = (
   socket: Socket,
   head: Buffer,
   proxyRequest: ProxyRequest,
+  proxyCancel: WebSocketProxyCancelRequest,
   path: string,
   context: Record<string, any>
 ) => Promise<void>;

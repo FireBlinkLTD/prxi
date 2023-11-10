@@ -4,6 +4,7 @@ import { Socket } from "net";
 import { RequestUtils, WebSocketUtils } from "./utils";
 import { HttpProxyHandler, WebSocketProxyHandler } from "./handlers";
 import { UpstreamConfiguration } from "./interfaces/UpstreamConfiguration";
+import { OutgoingHttpHeaders } from "http2";
 
 interface Proxy {
   upstream: UpstreamConfiguration,
@@ -138,22 +139,31 @@ export class Prxi {
         && req.method.toUpperCase() === 'GET'
         && handler
       ) {
-        handler.handle(req, socket, head, async (proxyConfiguration?: ProxyRequestConfiguration): Promise<void> => {
-          this.logInfo(`[${requestId}] [Prxi] Handling WS proxy request for path: ${path}`);
-          await proxy.ws.proxy(requestId, req, socket, head, proxyConfiguration);
-        }, path, context)
-        .catch(err => {
+        const headersToSet = RequestUtils.prepareProxyHeaders(
+          {},
+          this.configuration.responseHeaders,
+          proxy.upstream.responseHeaders,
+        );
+
+        handler.handle(
+          req,
+          socket,
+          head,
+          // handle
+          async (proxyConfiguration?: ProxyRequestConfiguration): Promise<void> => {
+            this.logInfo(`[${requestId}] [Prxi] Handling WS proxy request for path: ${path}`);
+            await proxy.ws.proxy(requestId, req, socket, head, proxyConfiguration);
+          },
+          // cancel
+          (status: number, description: string) => {
+            this.logError(`[${requestId}] [Prxi] cancel websocket request with ${status}: ${description}`);
+            Prxi.closeSocket(req, socket, status, description, headersToSet);
+          },
+          path,
+          context
+        ).catch(err => {
           this.logError(`[${requestId}] [Prxi] Unable to handle websocket request`, err);
-
-          const headersToSet = RequestUtils.prepareProxyHeaders(
-            {},
-            this.configuration.responseHeaders,
-            proxy.upstream.responseHeaders,
-          );
-          socket.write(WebSocketUtils.prepareRawHeadersString(`HTTP/${req.httpVersion} 500 Unexpected error ocurred`, headersToSet));
-
-          // destroy socket cause we can't handle it
-          socket.destroy();
+          Prxi.closeSocket(req, socket, 500, 'Unexpected error ocurred', headersToSet);
         });
       } else {
         this.logInfo(`[${requestId}] [Prxi] Unable to handle upgrade request`);
@@ -162,10 +172,8 @@ export class Prxi {
           {},
           this.configuration.responseHeaders,
         );
-        socket.write(WebSocketUtils.prepareRawHeadersString(`HTTP/${req.httpVersion} 405 Upgrade could not be processed`, headersToSet));
 
-        // destroy socket cause we can't handle it
-        socket.destroy();
+        Prxi.closeSocket(req, socket, 405, 'Upgrade could not be processed', headersToSet);
       }
     });
 
@@ -177,6 +185,19 @@ export class Prxi {
         res();
       });
     });
+  }
+
+  /**
+   * Close socket
+   * @param req
+   * @param socket
+   * @param status
+   * @param description
+   * @param headers
+   */
+  private static closeSocket(req: IncomingMessage, socket: Socket, status: number, message: string, headers: OutgoingHttpHeaders): void {
+    socket.write(WebSocketUtils.prepareRawHeadersString(`HTTP/${req.httpVersion} ${status} ${message}`, headers));
+    socket.destroy();
   }
 
   /**

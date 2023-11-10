@@ -1,5 +1,5 @@
 import {suite, test} from '@testdeck/mocha';
-import { TestServer, TestProxy, assertReject, writeJson } from './helpers';
+import { TestServer, TestProxy, assertReject, writeJson, TestProxyParams } from './helpers';
 import axios from 'axios';
 import {deepEqual, equal, strictEqual, match} from 'assert';
 import { IncomingMessage, ServerResponse } from 'http';
@@ -42,7 +42,10 @@ export class HttpProxyErrorSuite {
 
     @test()
     async addressNotFoundFailErrorHandler(): Promise<void> {
-      this.proxy = new TestProxy({}, 'non-existing-host');
+      const params = new TestProxyParams();
+      params.host = 'non-existing-host';
+
+      this.proxy = new TestProxy(params);
       await this.proxy.start();
 
       const result = axios.post(`${this.proxyUrl}/echo`, { test: true });
@@ -53,11 +56,15 @@ export class HttpProxyErrorSuite {
     @test()
     async addressNotFoundPassErrorHandler(): Promise<void> {
       const customError = 'Custom Error';
-      this.proxy = new TestProxy({}, 'non-existing-host', async (req: IncomingMessage, res: ServerResponse, err: Error): Promise<void> => {
-        match(err.message, /getaddrinfo .* non-existing-host/gi);
 
+      const params = new TestProxyParams();
+      params.host = 'non-existing-host';
+      params.customErrorHandler = async (req: IncomingMessage, res: ServerResponse, err: Error): Promise<void> => {
+        match(err.message, /getaddrinfo .* non-existing-host/gi);
         await writeJson(res, JSON.stringify({customError}));
-      });
+      };
+
+      this.proxy = new TestProxy(params);
       await this.proxy.start();
 
       const result = await axios.post(`${this.proxyUrl}/echo`, { test: true });
@@ -67,10 +74,15 @@ export class HttpProxyErrorSuite {
     @test()
     async missingHandler(): Promise<void> {
       let msg = null;
-      this.proxy = new TestProxy({}, 'localhost', async (req: IncomingMessage, res: ServerResponse, err?: Error) => {
+
+      const params = new TestProxyParams();
+      params.customErrorHandler = async (req: IncomingMessage, res: ServerResponse, err?: Error) => {
         msg = err.message;
         throw err;
-      }, false);
+      };
+      params.isMatching = false;
+
+      this.proxy = new TestProxy(params);
       await this.proxy.start();
 
       const result = axios.post(`${this.proxyUrl}/missing`, { test: true });
@@ -81,10 +93,15 @@ export class HttpProxyErrorSuite {
     @test()
     async noHandlers(): Promise<void> {
       let msg = null;
-      this.proxy = new TestProxy({}, 'localhost', async (req: IncomingMessage, res: ServerResponse, err?: Error) => {
+
+      const params = new TestProxyParams();
+      params.isMatching = null;
+      params.customErrorHandler = async (req: IncomingMessage, res: ServerResponse, err?: Error) => {
         msg = err.message;
         throw err;
-      }, null);
+      };
+
+      this.proxy = new TestProxy(params);
       await this.proxy.start();
 
       const result = axios.post(`${this.proxyUrl}/missing`, { test: true });
@@ -94,7 +111,12 @@ export class HttpProxyErrorSuite {
 
     @test()
     async noWebSocketHandler(): Promise<void> {
-      this.proxy = new TestProxy({}, 'localhost', false, true, false);
+      const params = new TestProxyParams();
+      params.customErrorHandler = false;
+      params.isMatching = true;
+      params.customWsHandler = false;
+
+      this.proxy = new TestProxy(params);
       await this.proxy.start();
       const sio = io(`http://localhost:${TestProxy.PORT}`, {
         transports: ['websocket'],
@@ -117,9 +139,14 @@ export class HttpProxyErrorSuite {
 
     @test()
     async failedWebSocketHandler(): Promise<void> {
-      this.proxy = new TestProxy({}, 'localhost', null, true, async () => {
+      const params = new TestProxyParams();
+      params.customErrorHandler = false;
+      params.isMatching = true;
+      params.customWsHandler = async () => {
         throw new Error('test');
-      });
+      };
+
+      this.proxy = new TestProxy(params);
       await this.proxy.start();
 
       const sio = io(`http://localhost:${TestProxy.PORT}`, {
