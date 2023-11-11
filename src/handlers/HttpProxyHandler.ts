@@ -44,18 +44,20 @@ export class HttpProxyHandler {
 
     this.logInfo(`[${requestId}] [HttpProxyHandler] Processing HTTP/HTTPS proxy request with method ${method} to ${target}${url}`);
 
+    const requestHeadersToSend = RequestUtils.prepareProxyHeaders(
+      req.headers,
+      this.configuration.proxyRequestHeaders,
+      this.upstream.proxyRequestHeaders,
+      // istanbul ignore next
+      proxyConfiguration?.proxyRequestHeaders,
+    );
+
+    const isKeepAliveRequest = req.headers.connection.toLowerCase() === 'keep-alive';
     const options: RequestOptions = {
       method,
       host,
       port,
-
-      headers: RequestUtils.prepareProxyHeaders(
-        req.headers,
-        this.configuration.proxyRequestHeaders,
-        this.upstream.proxyRequestHeaders,
-        // istanbul ignore next
-        proxyConfiguration?.proxyRequestHeaders,
-      ),
+      headers: requestHeadersToSend,
       path: RequestUtils.concatPath(initialPath, url),
       timeout: this.configuration.proxyRequestTimeout,
     };
@@ -70,6 +72,13 @@ export class HttpProxyHandler {
       });
 
       client.on('response', (response: IncomingMessage) => {
+        if (isKeepAliveRequest) {
+          client.setTimeout(0);
+        }
+
+        // map status code
+        res.statusCode = response.statusCode;
+
         const headersToSet = RequestUtils.prepareProxyHeaders(
           response.headers,
           this.configuration.responseHeaders,

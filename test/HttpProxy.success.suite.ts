@@ -62,6 +62,24 @@ export class HttpProxySuccessSuite {
   }
 
   @test()
+  async echoRequestWithKeepAliveConnection(): Promise<void> {
+    await this.initProxy();
+
+    const testData = [];
+    for (let i = 0; i < 1000 * 1000; i++) {
+      testData.push('Iteration - ' + i);
+    }
+
+    const result = await axios.post(`${this.proxyUrl}/echo`, testData, {
+      maxBodyLength: 50 * 1024 * 1024, // 50 mb
+      headers: {
+        'Connection': 'keep-alive'
+      }
+    });
+    deepEqual(result.data, testData);
+  }
+
+  @test()
   async customPath(): Promise<void> {
     await this.after();
     this.server = new TestServer(true, '/api');
