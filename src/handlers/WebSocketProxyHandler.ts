@@ -42,7 +42,11 @@ export class WebSocketProxyHandler {
   ): Promise<void> {
     try {
       WebSocketProxyHandler.debug.incomingSocket = socket;
-      proxyConfiguration = proxyConfiguration || emptyObj;
+      /* istanbul ignore next */
+      if (!proxyConfiguration) {
+        proxyConfiguration = emptyObj;
+      }
+
 
       // istanbul ignore next
       let target = proxyConfiguration.target || this.upstream.target;
@@ -73,6 +77,11 @@ export class WebSocketProxyHandler {
         path: RequestUtils.concatPath(initialPath, url),
         timeout: this.configuration.proxyRequestTimeout,
       };
+
+      /* istanbul ignore else */
+      if (proxyConfiguration && proxyConfiguration.onBeforeProxyRequest) {
+        proxyConfiguration.onBeforeProxyRequest(options);
+      }
 
       const client = request(options);
       WebSocketProxyHandler.debug.upstreamRequest = client;

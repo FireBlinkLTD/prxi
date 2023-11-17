@@ -1,7 +1,8 @@
 import { IncomingMessage, ServerResponse } from 'http';
 import { Duplex } from 'stream';
-import { ErrorHandler, Prxi, ProxyRequest, WebSocketHandlerFunction, WebSocketHandlerConfig, Configuration } from '../../src';
+import { ErrorHandler, Prxi, ProxyRequest, WebSocketHandlerFunction, WebSocketHandlerConfig, Configuration, ProxyRequestConfiguration } from '../../src';
 import { TestServer } from './TestServer';
+import { RequestOptions } from 'https';
 
 export class TestProxyParams {
   configOverride?: Partial<Configuration>;
@@ -107,6 +108,12 @@ export class TestProxy {
         RESConfigLevelOverwrite: 'PROXY-RESPONSE-OVERWRITE',
         RESProxyLevelClear: null,
       },
+      onBeforeProxyRequest: (options: RequestOptions) => {
+        options.headers['ON_BEFORE_PROXY_HEADER'] = 'yes';
+      },
+      onBeforeResponse: (res, outgoingHeaders) => {
+        outgoingHeaders['ON_BEFORE_RESPONSE_HEADER'] = 'yes';
+      }
     });
   }
 
@@ -117,8 +124,12 @@ export class TestProxy {
    * @param head
    * @param handle
    */
-  private async wsHandler(req: IncomingMessage, socket: Duplex, head: Buffer, handle: () => Promise<void>) {
-    await handle();
+  private async wsHandler(req: IncomingMessage, socket: Duplex, head: Buffer, handle: (configuration?: ProxyRequestConfiguration) => Promise<void>) {
+    await handle({
+      onBeforeProxyRequest: (options: RequestOptions) => {
+        options.headers['ON_BEFORE_WS_PROXY_HEADER'] = 'yes';
+      }
+    });
   }
 
   /**

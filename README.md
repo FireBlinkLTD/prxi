@@ -21,6 +21,7 @@ yarn add prxi
 
 ```typescript
 import { Prxi, HttpMethod, ProxyRequest} from 'prxi';
+import { OutgoingHttpHeaders, RequestOptions, ServerResponse } from 'http';
 
 // Instantiate new Prxi, requires a src/Configuration.ts configuration object
 const proxy = new Prxi({
@@ -139,6 +140,25 @@ const requestHandlers = [
           'X-ADD_TO_RESPONSE': 'value',
           'X-REMOVE_FROM_RESPONSE': null,
         },
+
+        /**
+         * Optional handler before making the proxy request
+         * @param options request options
+         * @returns
+         */
+        onBeforeProxyRequest: (options: RequestOptions) => {
+
+        }
+
+        /**
+         * Optional handler before sending a response
+         * @param res
+         * @param outgoingHeaders
+         * @returns
+         */
+        onBeforeResponse: (res: ServerResponse, outgoingHeaders: OutgoingHttpHeaders) => {
+
+        }
       });
     }
   }
@@ -189,6 +209,15 @@ const webSocketHandlers = [
           'X-ADD_TO_RESPONSE': 'value',
           'X-REMOVE_FROM_RESPONSE': null,
         },
+
+        /**
+         * Optional handler before making the proxy request
+         * @param options request options
+         * @returns
+         */
+        onBeforeProxyRequest: (options: RequestOptions) => {
+
+        }
       );
 
       // alternatively cancel request with custom http status code and message

@@ -1,6 +1,5 @@
-import { IncomingMessage, ServerResponse } from "node:http";
-import {request as httpRequest, RequestOptions} from 'node:http';
-import {request as httpsRequest} from 'node:https';
+import {request as httpRequest, RequestOptions, IncomingMessage, ServerResponse} from 'http';
+import {request as httpsRequest} from 'https';
 
 import { Configuration, ProxyRequestConfiguration } from "../interfaces";
 import { UpstreamConfiguration } from "../interfaces/UpstreamConfiguration";
@@ -62,6 +61,11 @@ export class HttpProxyHandler {
       timeout: this.configuration.proxyRequestTimeout,
     };
 
+    /* istanbul ignore else */
+    if (proxyConfiguration && proxyConfiguration.onBeforeProxyRequest) {
+      proxyConfiguration.onBeforeProxyRequest(options);
+    }
+
     const client = request(options);
 
     await new Promise<void>((resolve, reject) => {
@@ -86,6 +90,12 @@ export class HttpProxyHandler {
           // istanbul ignore next
           proxyConfiguration?.proxyResponseHeaders
         );
+
+        /* istanbul ignore else */
+        if (proxyConfiguration && proxyConfiguration.onBeforeResponse) {
+          proxyConfiguration.onBeforeResponse(res, headersToSet);
+        }
+
         RequestUtils.updateResponseHeaders(res, headersToSet);
 
         // istanbul ignore else

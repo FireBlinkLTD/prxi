@@ -131,6 +131,7 @@ export class HttpProxySuccessSuite {
       reqproxylevelclear: result.data.headers['reqproxylevelclear'],
       reqconfiglevel: result.data.headers['reqconfiglevel'],
       test: result.data.headers['test'],
+      ON_BEFORE_PROXY_HEADER: result.data.headers['ON_BEFORE_PROXY_HEADER'.toLowerCase()],
     }
 
     deepEqual(requestHeaders, {
@@ -139,6 +140,7 @@ export class HttpProxySuccessSuite {
       reqproxylevel: 'PROXY-REQUEST',
       reqproxylevelclear: undefined,
       test: 'true',
+      ON_BEFORE_PROXY_HEADER: 'yes',
     });
 
     const responseHeaders = {
@@ -147,6 +149,7 @@ export class HttpProxySuccessSuite {
       resproxylevel: result.headers['resproxylevel'],
       resproxylevelclear: result.headers['resproxylevelclear'],
       ['res-test']: result.headers['res-test'],
+      ON_BEFORE_RESPONSE_HEADER: result.headers['ON_BEFORE_RESPONSE_HEADER'.toLowerCase()],
     }
 
     deepEqual(responseHeaders, {
@@ -155,6 +158,7 @@ export class HttpProxySuccessSuite {
       resproxylevel: 'PROXY-RESPONSE',
       resproxylevelclear: undefined,
       ['res-test']: 'test-res',
+      ON_BEFORE_RESPONSE_HEADER: 'yes',
     });
   }
 

@@ -1,7 +1,5 @@
 import { OutgoingHttpHeaders, OutgoingMessage, IncomingMessage, IncomingHttpHeaders } from "http";
 
-const emptyObj = {};
-
 export class RequestUtils {
   /**
    * Extract path from the request

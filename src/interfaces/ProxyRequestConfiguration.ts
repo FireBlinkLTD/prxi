@@ -1,3 +1,4 @@
+import { OutgoingHttpHeaders, RequestOptions, ServerResponse } from 'http';
 import { HttpMethod } from './RequestHandler';
 
 export interface ProxyRequestConfiguration {
@@ -18,4 +19,19 @@ export interface ProxyRequestConfiguration {
 
   // Proxy response headers to add/replace/remove on top of the Configuration ones (if any)
   proxyResponseHeaders?: Record<string, string | string[] | null>;
+
+  /**
+   * Optional handler before making the proxy request
+   * @param options request options
+   * @returns
+   */
+  onBeforeProxyRequest?: (options: RequestOptions) => void;
+
+  /**
+   * Optional handler before sending a response
+   * @param res
+   * @param outgoingHeaders
+   * @returns
+   */
+  onBeforeResponse?: (res: ServerResponse, outgoingHeaders: OutgoingHttpHeaders) => void;
 }
