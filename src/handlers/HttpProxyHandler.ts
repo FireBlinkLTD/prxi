@@ -51,7 +51,7 @@ export class HttpProxyHandler {
       proxyConfiguration?.proxyRequestHeaders,
     );
 
-    const isKeepAliveRequest = req.headers.connection.toLowerCase() === 'keep-alive';
+    const isKeepAliveRequest = req.headers.connection && req.headers.connection.toLowerCase() === 'keep-alive';
     const options: RequestOptions = {
       method,
       host,
