@@ -1,10 +1,23 @@
 import { Configuration, HttpMethod, ProxyRequestConfiguration, WebSocketHandlerConfig, Request, Response, Server, HttpRequestHandlerConfig, Http2RequestHandlerConfig  } from "./interfaces";
-import { IncomingMessage, ServerResponse, createServer as createHttp1Server } from "http";
 import { Socket } from "net";
 import { RequestUtils, WebSocketUtils } from "./utils";
 import { HttpProxyHandler, Http2ProxyHandler, WebSocketProxyHandler } from "./handlers";
 import { UpstreamConfiguration } from "./interfaces/UpstreamConfiguration";
-import { OutgoingHttpHeaders, createServer as createHttp2Server, constants, ServerHttp2Stream, IncomingHttpHeaders } from "http2";
+import {
+  IncomingMessage,
+  ServerResponse,
+  createServer as createHttp1Server,
+} from "node:http";
+import { createServer as createSecureHttp1Server } from 'node:https';
+import {
+  OutgoingHttpHeaders,
+  createServer as createHttp2Server,
+  createSecureServer as createSecureHttp2Server,
+  constants,
+  ServerHttp2Stream,
+  IncomingHttpHeaders,
+  ServerOptions,
+} from "node:http2";
 
 interface Proxy {
   upstream: UpstreamConfiguration,
@@ -42,11 +55,28 @@ export class Prxi {
   private get createServer() {
     return ((cb: (req: Request, res: Response) => void): Server => {
       if (this.configuration.mode === 'HTTP') {
+        if (this.configuration.secure) {
+          return createSecureHttp1Server({
+            key: this.configuration.secure.key,
+            cert: this.configuration.secure.cert,
+          }, cb);
+        }
+
         return createHttp1Server(cb);
       }
 
       if (this.configuration.mode === 'HTTP2') {
-        return createHttp2Server(cb);
+        if (this.configuration.secure) {
+          return createSecureHttp2Server({
+            allowHTTP1: true,
+            key: this.configuration.secure.key,
+            cert: this.configuration.secure.cert,
+          }, cb);
+        }
+
+        return createHttp2Server(<ServerOptions> {
+          allowHTTP1: true,
+        }, cb);
       }
 
       throw new Error(`Invalid mode provided inside the configuration object "${this.configuration.mode}", expected HTTP or HTTP2`);
@@ -217,6 +247,10 @@ export class Prxi {
         });
       });
     }
+
+    server.on('clientError', (err) => {
+      this.logError(`[Prxi] Client Error`, err);
+    })
 
     // keep track of all open connections
     server.on('connection', (connection: Socket) => {

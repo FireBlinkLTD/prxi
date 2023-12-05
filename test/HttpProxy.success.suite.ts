@@ -8,20 +8,22 @@ import { Socket as NetSocket } from 'net';
 import { FetchHelpers } from './helpers/FetchHelper';
 
 abstract class BaseHttpProxySuccessSuite {
-  constructor(private mode: 'HTTP' | 'HTTP2') {}
+  constructor(private mode: 'HTTP' | 'HTTP2', private secure = false) {
+    console.log(`========= ${mode} ${secure ? '[secure]' : ''} =========`)
+  }
 
   private server: TestServer = null;
   private proxy: TestProxy = null;
 
   private get proxyUrl() {
-    return `http://localhost:${TestProxy.PORT}`;
+    return new FetchHelpers(this.mode, this.secure).fixUrl(`http://localhost:${TestProxy.PORT}`);
   }
 
   /**
    * Before hook
    */
   async before(): Promise<void> {
-    this.server = new TestServer(this.mode, true);
+    this.server = new TestServer(this.mode, this.secure, true);
     this.proxy = null;
 
     await this.server.start();
@@ -42,6 +44,7 @@ abstract class BaseHttpProxySuccessSuite {
     const params = new TestProxyParams();
     params.configOverride = configOverride;
     params.mode = this.mode;
+    params.secure = this.secure;
 
     this.proxy = new TestProxy(params);
     await this.proxy.start();
@@ -56,7 +59,7 @@ abstract class BaseHttpProxySuccessSuite {
       testData.push('Iteration - ' + i);
     }
 
-    const result = await new FetchHelpers(this.mode).post(`${this.proxyUrl}/echo`, testData);
+    const result = await new FetchHelpers(this.mode, this.secure).post(`${this.proxyUrl}/echo`, testData);
     deepEqual(result, testData);
   }
 
@@ -74,7 +77,7 @@ abstract class BaseHttpProxySuccessSuite {
       testData.push('Iteration - ' + i);
     }
 
-    const result = await new FetchHelpers(this.mode).post(`${this.proxyUrl}/echo`, testData, {
+    const result = await new FetchHelpers(this.mode, this.secure).post(`${this.proxyUrl}/echo`, testData, {
       'Connection': 'keep-alive',
     });
     deepEqual(result, testData);
@@ -83,10 +86,11 @@ abstract class BaseHttpProxySuccessSuite {
   @test()
   async customPath(): Promise<void> {
     await this.after();
-    this.server = new TestServer(this.mode, true, '/api');
+    this.server = new TestServer(this.mode, this.secure, true, '/api');
     const params = new TestProxyParams();
     params.prefix = '/api';
     params.mode = this.mode;
+    params.secure = this.secure;
     this.proxy = new TestProxy(params);
     await this.proxy.start();
 
@@ -97,7 +101,7 @@ abstract class BaseHttpProxySuccessSuite {
       testData.push('Iteration - ' + i);
     }
 
-    const result = await new FetchHelpers(this.mode).post(`${this.proxyUrl}/echo`, testData);
+    const result = await new FetchHelpers(this.mode, this.secure).post(`${this.proxyUrl}/echo`, testData);
     deepEqual(result, testData);
   }
 
@@ -105,7 +109,7 @@ abstract class BaseHttpProxySuccessSuite {
   async queryRequest(): Promise<void> {
     await this.initProxy();
 
-    const result = await new FetchHelpers(this.mode).get(`${this.proxyUrl}/query?test=1`);
+    const result = await new FetchHelpers(this.mode, this.secure).get(`${this.proxyUrl}/query?test=1`);
     deepEqual(result.data, {
       query: {
         test: '1',
@@ -117,7 +121,7 @@ abstract class BaseHttpProxySuccessSuite {
   async headersRequest(): Promise<void> {
     await this.initProxy();
 
-    const result = await new FetchHelpers(this.mode).get(`${this.proxyUrl}/headers`, {
+    const result = await new FetchHelpers(this.mode, this.secure).get(`${this.proxyUrl}/headers`, {
       ReqConfigLevelCLEAR: 'empty',
       REQConfigLevelOverwrite: 'overwrite',
       Test: 'true',
@@ -148,7 +152,7 @@ abstract class BaseHttpProxySuccessSuite {
       resproxylevel: result.headers['resproxylevel'],
       resproxylevelclear: result.headers['resproxylevelclear'],
       ['res-test']: result.headers['res-test'],
-      ON_BEFORE_RESPONSE_HEADER: result.headers['(ON_BEFORE_RESPONSE_HEADER'.toLowerCase()],
+      ON_BEFORE_RESPONSE_HEADER: result.headers['ON_BEFORE_RESPONSE_HEADER'.toLowerCase()],
     }
 
     deepEqual(responseHeaders, {
@@ -163,8 +167,13 @@ abstract class BaseHttpProxySuccessSuite {
 
   @test()
   async websocketHandle(): Promise<void> {
+    if (this.mode === 'HTTP2' && !this.secure) {
+      // invalid test for the HTTP/2 connection, as connection should be secured
+      return;
+    }
+
     await this.initProxy();
-    const sio = io(`http://localhost:${TestProxy.PORT}`, {
+    const sio = io(this.proxyUrl, {
       transports: ['websocket'],
       reconnection: false,
     });
@@ -176,6 +185,10 @@ abstract class BaseHttpProxySuccessSuite {
         sio.disconnect();
         rej(new Error('Unable to connect to WS'));
       }, 2000);
+
+      sio.on('connect_error', (err) => {
+        console.error('connection error', err);
+      });
 
       sio.on('connect', () => {
         sio.on('echo', (msg: string) => {
@@ -193,9 +206,14 @@ abstract class BaseHttpProxySuccessSuite {
 
   @test()
   async websocketCancel(): Promise<void> {
+    if (this.mode === 'HTTP2' && !this.secure) {
+      // invalid test for the HTTP/2 connection, as connection should be secured
+      return;
+    }
+
     await this.after();
 
-    this.server = new TestServer(this.mode, true);
+    this.server = new TestServer(this.mode, this.secure, true);
     await this.server.start();
 
     const status = 418;
@@ -203,6 +221,7 @@ abstract class BaseHttpProxySuccessSuite {
 
     const params = new TestProxyParams();
     params.mode = this.mode;
+    params.secure = this.secure;
     params.customWsHandler = async (
         req: IncomingMessage,
         socket: NetSocket,
@@ -217,7 +236,7 @@ abstract class BaseHttpProxySuccessSuite {
     this.proxy = new TestProxy(params);
     await this.proxy.start();
 
-    const sio = io(`http://localhost:${TestProxy.PORT}`, {
+    const sio = io(this.proxyUrl, {
       transports: ['websocket'],
       reconnection: false,
     });
@@ -245,8 +264,22 @@ export class Http1ProxySuccessSuite extends BaseHttpProxySuccessSuite {
 }
 
 @suite()
+export class Http1ProxySuccessSuiteSecure extends BaseHttpProxySuccessSuite {
+  constructor() {
+    super('HTTP', true)
+  }
+}
+
+@suite()
 export class Http2ProxySuccessSuite extends BaseHttpProxySuccessSuite {
   constructor() {
     super('HTTP2')
+  }
+}
+
+@suite()
+export class Http2ProxySuccessSuiteSecure extends BaseHttpProxySuccessSuite {
+  constructor() {
+    super('HTTP2', true)
   }
 }

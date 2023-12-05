@@ -7,22 +7,22 @@ import { WebSocketProxyHandler } from '../src/handlers';
 import { FetchHelpers } from './helpers/FetchHelper';
 
 abstract class BaseHttpProxyErrorSuite {
-    constructor(private mode: 'HTTP' | 'HTTP2') {
-      console.log(`========= ${mode} =========`)
+    constructor(private mode: 'HTTP' | 'HTTP2', private secure = false) {
+      console.log(`========= ${mode} ${secure ? '[secure]' : ''} =========`)
     }
 
     private server: TestServer = null;
     private proxy: TestProxy = null;
 
     private get proxyUrl() {
-      return `http://localhost:${TestProxy.PORT}`;
+      return new FetchHelpers(this.mode, this.secure).fixUrl(`http://localhost:${TestProxy.PORT}`);
     }
 
     /**
      * Before hook
      */
     async before(): Promise<void> {
-      this.server = new TestServer(this.mode, true);
+      this.server = new TestServer(this.mode, this.secure, true);
       await this.server.start();
     }
 
@@ -38,6 +38,7 @@ abstract class BaseHttpProxyErrorSuite {
     async doubleProxyStop() {
       const params = new TestProxyParams();
       params.mode = this.mode;
+      params.secure = this.secure;
       this.proxy = new TestProxy(params);
       await this.proxy.start();
 
@@ -49,12 +50,13 @@ abstract class BaseHttpProxyErrorSuite {
     async addressNotFoundFailErrorHandler(): Promise<void> {
       const params = new TestProxyParams();
       params.mode = this.mode;
+      params.secure = this.secure;
       params.host = 'non-existing-host';
 
       this.proxy = new TestProxy(params);
       await this.proxy.start();
 
-      const result = await new FetchHelpers(this.mode).post(`${this.proxyUrl}/echo`, { test: true });
+      const result = await new FetchHelpers(this.mode, this.secure).post(`${this.proxyUrl}/echo`, { test: true });
       equal(result.error, 'Unexpected error occurred');
     }
 
@@ -64,6 +66,7 @@ abstract class BaseHttpProxyErrorSuite {
 
       const params = new TestProxyParams();
       params.mode = this.mode;
+      params.secure = this.secure;
       params.host = 'non-existing-host';
       params.customErrorHandler = async (req: IncomingMessage, res: ServerResponse, err: Error): Promise<void> => {
         match(err.message, /getaddrinfo .* non-existing-host/gi);
@@ -73,7 +76,7 @@ abstract class BaseHttpProxyErrorSuite {
       this.proxy = new TestProxy(params);
       await this.proxy.start();
 
-      const result = await new FetchHelpers(this.mode).post(`${this.proxyUrl}/echo`, { test: true });
+      const result = await new FetchHelpers(this.mode, this.secure).post(`${this.proxyUrl}/echo`, { test: true });
       deepEqual(result.customError, customError);
     }
 
@@ -83,6 +86,7 @@ abstract class BaseHttpProxyErrorSuite {
 
       const params = new TestProxyParams();
       params.mode = this.mode;
+      params.secure = this.secure;
       params.customErrorHandler = async (req: IncomingMessage, res: ServerResponse, err?: Error) => {
         msg = err.message;
         throw err;
@@ -92,7 +96,7 @@ abstract class BaseHttpProxyErrorSuite {
       this.proxy = new TestProxy(params);
       await this.proxy.start();
 
-      const result = await new FetchHelpers(this.mode).post(`${this.proxyUrl}/missing`, { test: true });
+      const result = await new FetchHelpers(this.mode, this.secure).post(`${this.proxyUrl}/missing`, { test: true });
       equal(result.error, 'Unexpected error occurred');
       equal(msg, 'Missing RequestHandler configuration for the "POST:/missing" request');
     }
@@ -103,6 +107,7 @@ abstract class BaseHttpProxyErrorSuite {
 
       const params = new TestProxyParams();
       params.mode = this.mode;
+      params.secure = this.secure;
       params.isMatching = null;
       params.customErrorHandler = async (req: IncomingMessage, res: ServerResponse, err?: Error) => {
         msg = err.message;
@@ -112,7 +117,7 @@ abstract class BaseHttpProxyErrorSuite {
       this.proxy = new TestProxy(params);
       await this.proxy.start();
 
-      const result = await new FetchHelpers(this.mode).post(`${this.proxyUrl}/missing`, { test: true });
+      const result = await new FetchHelpers(this.mode, this.secure).post(`${this.proxyUrl}/missing`, { test: true });
       equal(result.error, 'Unexpected error occurred');
       equal(msg, 'Missing RequestHandler configuration for the "POST:/missing" request');
     }
@@ -121,13 +126,14 @@ abstract class BaseHttpProxyErrorSuite {
     async noWebSocketHandler(): Promise<void> {
       const params = new TestProxyParams();
       params.mode = this.mode;
+      params.secure = this.secure;
       params.customErrorHandler = false;
       params.isMatching = true;
       params.customWsHandler = false;
 
       this.proxy = new TestProxy(params);
       await this.proxy.start();
-      const sio = io(`http://localhost:${TestProxy.PORT}`, {
+      const sio = io(this.proxyUrl, {
         transports: ['websocket'],
         reconnection: false,
       });
@@ -150,6 +156,7 @@ abstract class BaseHttpProxyErrorSuite {
     async failedWebSocketHandler(): Promise<void> {
       const params = new TestProxyParams();
       params.mode = this.mode;
+      params.secure = this.secure;
       params.customErrorHandler = false;
       params.isMatching = true;
       params.customWsHandler = async () => {
@@ -159,7 +166,7 @@ abstract class BaseHttpProxyErrorSuite {
       this.proxy = new TestProxy(params);
       await this.proxy.start();
 
-      const sio = io(`http://localhost:${TestProxy.PORT}`, {
+      const sio = io(this.proxyUrl, {
         transports: ['websocket'],
         reconnection: false,
       });
@@ -183,10 +190,11 @@ abstract class BaseHttpProxyErrorSuite {
     async erroredWebSocketHandler(): Promise<void> {
       const params = new TestProxyParams();
       params.mode = this.mode;
+      params.secure = this.secure;
       this.proxy = new TestProxy(params);
       await this.proxy.start();
 
-      const sio = io(`http://localhost:${TestProxy.PORT}`, {
+      const sio = io(this.proxyUrl, {
         transports: ['websocket'],
         reconnection: false,
       });
@@ -213,10 +221,11 @@ abstract class BaseHttpProxyErrorSuite {
     async erroredUpstreamSocketHandler(): Promise<void> {
       const params = new TestProxyParams();
       params.mode = this.mode;
+      params.secure = this.secure;
       this.proxy = new TestProxy(params);
       await this.proxy.start();
 
-      const sio = io(`http://localhost:${TestProxy.PORT}`, {
+      const sio = io(this.proxyUrl, {
         transports: ['websocket'],
         reconnection: false,
       });
@@ -243,10 +252,11 @@ abstract class BaseHttpProxyErrorSuite {
     async erroredIncomingSocketHandler(): Promise<void> {
       const params = new TestProxyParams();
       params.mode = this.mode;
+      params.secure = this.secure;
       this.proxy = new TestProxy(params);
       await this.proxy.start();
 
-      const sio = io(`http://localhost:${TestProxy.PORT}`, {
+      const sio = io(this.proxyUrl, {
         transports: ['websocket'],
         reconnection: false,
       });
@@ -273,15 +283,16 @@ abstract class BaseHttpProxyErrorSuite {
     async wsNotSupportedByUpstream(): Promise<void> {
       // restart server with WS disabled
       await this.server.stop();
-      this.server = new TestServer(this.mode, false);
+      this.server = new TestServer(this.mode, this.secure, false);
       await this.server.start();
 
       const params = new TestProxyParams();
       params.mode = this.mode;
+      params.secure = this.secure;
       this.proxy = new TestProxy(params);
       await this.proxy.start();
 
-      const sio = io(`http://localhost:${TestProxy.PORT}`, {
+      const sio = io(this.proxyUrl, {
         transports: ['websocket'],
         reconnection: false,
       });
@@ -305,6 +316,13 @@ abstract class BaseHttpProxyErrorSuite {
 export class Http1ProxyErrorSuite extends BaseHttpProxyErrorSuite {
   constructor() {
     super('HTTP');
+  }
+}
+
+@suite()
+export class Http1ProxyErrorSuiteSecure extends BaseHttpProxyErrorSuite {
+  constructor() {
+    super('HTTP', true);
   }
 }
 

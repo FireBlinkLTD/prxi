@@ -1,27 +1,53 @@
 import { createServer as createHttp1Server, Server as HTTPServer } from 'http';
-import { constants, createServer as createHttp2Server, ServerHttp2Stream } from 'http2';
+import { ServerOptions, constants, createServer as createHttp2Server, ServerHttp2Stream, createSecureServer as createSecureHttp2Server} from 'http2';
+import { createServer as createSecureHttp1Server } from 'node:https';
 import { writeJson } from './ResponseHelper';
 import { parse as queryParse } from 'querystring';
 import { parse as urlParse } from 'url';
 import  { Server as SocketIOServer } from 'socket.io';
 import { Request, Response, Server } from '../../src/interfaces';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 
 export class TestServer {
   public static readonly PORT = 7777;
   private server: Server;
   private socketIO: SocketIOServer;
+  private secureSettings?: {
+    key: string,
+    cert: string,
+  }
 
-  constructor(private mode: 'HTTP' | 'HTTP2', private wsEnabled: boolean, private prefix: string = '') {
+  constructor(private mode: 'HTTP' | 'HTTP2', private secure: boolean, private wsEnabled: boolean, private prefix: string = '') {
+    if (this.secure) {
+      this.secureSettings = {
+        key: readFileSync(resolve(__dirname, '../key.pem'), 'utf-8'),
+        cert: readFileSync(resolve(__dirname, '../cert.pem'), 'utf-8'),
+      }
+    }
   }
 
   private get createServer() {
     return ((cb: (req: Request, res: Response) => void): Server => {
       if (this.mode === 'HTTP') {
+        if (this.secure) {
+          return createSecureHttp1Server(this.secureSettings, cb);
+        }
+
         return createHttp1Server(cb);
       }
 
       if (this.mode === 'HTTP2') {
-        return createHttp2Server(cb);
+        if (this.secure) {
+          return createSecureHttp2Server({
+            ...this.secureSettings,
+            allowHTTP1: true,
+          }, cb);
+        }
+
+        return createHttp2Server(<ServerOptions> {
+          allowHTTP1: true,
+        }, cb);
       }
 
       throw new Error(`Unsupported mode ${this.mode}`);

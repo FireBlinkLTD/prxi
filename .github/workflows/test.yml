@@ -3,7 +3,7 @@ name: Tests
 on:
   push:
     branches:
-      - main
+      - '*'
 
 jobs:
   build_and_test:
@@ -23,6 +23,7 @@ jobs:
         uses: github/codeql-action/analyze@v2
 
       - run: yarn install
+      - run: yarn keygen
       - run: yarn test
       - run: yarn test:coverage
 

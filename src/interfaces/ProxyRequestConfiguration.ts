@@ -1,4 +1,4 @@
-import { OutgoingHttpHeaders, RequestOptions, ServerResponse } from 'http';
+import { OutgoingHttpHeaders, RequestOptions } from 'node:http';
 import { HttpMethod } from './RequestHandler';
 import { Response } from './Response';
 
@@ -23,16 +23,17 @@ export interface ProxyRequestConfiguration {
 
   /**
    * Optional handler before making the proxy request
-   * @param options request options
+   * @param options request options, can be null for HTTP/2 request
+   * @parma proxyHeaders
    * @returns
    */
-  onBeforeProxyRequest?: (options: RequestOptions) => void;
+  onBeforeProxyRequest?: (options: RequestOptions | null, proxyHeaders: OutgoingHttpHeaders) => void;
 
   /**
    * Optional handler before sending a response
-   * @param res
+   * @param res can be null for the HTTP/2 response
    * @param outgoingHeaders
    * @returns
    */
-  onBeforeResponse?: (res: Response, outgoingHeaders: OutgoingHttpHeaders) => void;
+  onBeforeResponse?: (res: Response | null, outgoingHeaders: OutgoingHttpHeaders) => void;
 }

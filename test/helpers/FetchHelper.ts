@@ -2,7 +2,15 @@ import { connect, constants } from 'node:http2';
 import path = require('node:path');
 
 export class FetchHelpers {
-  constructor(private mode: 'HTTP' | 'HTTP2') {}
+  constructor(private mode: 'HTTP' | 'HTTP2', private secure: boolean) {}
+
+  public fixUrl(url: string): string {
+    if (!this.secure) {
+      return url;
+    }
+
+    return url.replace(/http:\/\//i, 'https://').replace(/http:\/\//, 'wss://')
+  }
 
   /**
    * Make GET request
@@ -14,6 +22,7 @@ export class FetchHelpers {
     data: any,
     headers: Record<string, string>,
   }> {
+    url = this.fixUrl(url);
     console.log(`-> [${this.mode}] Making GET request to ${url}`);
 
     if (this.mode === 'HTTP') {
@@ -37,22 +46,27 @@ export class FetchHelpers {
     data: any,
     headers: Record<string, string>,
   }> {
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        ...headers
-      },
-    });
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          ...headers
+        },
+      });
 
-    const responseHeaders: Record<string, string> = {};
-    response.headers.forEach((k, v) => {
-      responseHeaders[k] = v.toString();
-    })
+      const responseHeaders: Record<string, string> = {};
+      for (const header of response.headers.keys()) {
+        responseHeaders[header] = response.headers.get(header).toString();
+      }
 
-    return {
-      data: await response.json(),
-      headers: responseHeaders,
-    };
+      return {
+        data: await response.json(),
+        headers: responseHeaders,
+      };
+    } catch (err) {
+      console.error(err);
+      throw err;
+    }
   }
 
    /**
@@ -109,6 +123,7 @@ export class FetchHelpers {
    * @returns
    */
   async post(url: string, data: unknown, headers: Record<string, string> = {}): Promise<any> {
+    url = this.fixUrl(url);
     console.log(`-> [${this.mode}] Making POST request to ${url}`);
 
     if (this.mode === 'HTTP') {
@@ -130,17 +145,22 @@ export class FetchHelpers {
    * @returns
    */
   private async postHttp1(url: string, data: unknown, headers: Record<string, string>): Promise<any> {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'accept': 'application/json',
-        ...headers
-      },
-      body: JSON.stringify(data),
-    });
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'accept': 'application/json',
+          ...headers
+        },
+        body: JSON.stringify(data),
+      });
 
-    return response.json();
+      return response.json();
+    } catch (err) {
+      console.error(err);
+      throw err;
+    }
   }
 
   /**

@@ -1,8 +1,11 @@
-import { IncomingMessage, ServerResponse } from 'http';
+import { IncomingMessage, ServerResponse } from 'node:http';
 import { Duplex } from 'stream';
 import { ErrorHandler, Prxi, ProxyRequest, WebSocketHandlerFunction, WebSocketHandlerConfig, Configuration, ProxyRequestConfiguration } from '../../src';
 import { TestServer } from './TestServer';
-import { RequestOptions } from 'https';
+import { RequestOptions } from 'node:https';
+import { OutgoingHttpHeaders } from 'node:http2';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 export class TestProxyParams {
   configOverride?: Partial<Configuration>;
@@ -12,6 +15,11 @@ export class TestProxyParams {
   customWsHandler?: WebSocketHandlerFunction | false;
   prefix?: string;
   mode: 'HTTP' | 'HTTP2';
+  secure: boolean;
+  secureSettings?: {
+    key: string,
+    cert: string,
+  }
 
   /**
    * Initialize default values
@@ -21,6 +29,13 @@ export class TestProxyParams {
     this.host = this.host ?? 'localhost';
     this.prefix = this.prefix ?? '';
     this.isMatching = this.isMatching === undefined ? true : this.isMatching;
+
+    if (this.secure) {
+      this.secureSettings = {
+        key: readFileSync(resolve(__dirname, '../key.pem'), 'utf-8'),
+        cert: readFileSync(resolve(__dirname, '../cert.pem'), 'utf-8'),
+      }
+    }
   }
 }
 
@@ -49,8 +64,9 @@ export class TestProxy {
     this.proxy = new Prxi({
       mode: this.params.mode || 'HTTP',
       port: TestProxy.PORT,
+      secure: this.params.secureSettings,
       upstream: [{
-        target: `http://${this.params.host}:${TestServer.PORT}${this.params.prefix}`,
+        target: `http${this.params.secure ? 's' : ''}://${this.params.host}:${TestServer.PORT}${this.params.prefix}`,
         requestHandlers: this.params.isMatching !== null ? [
           {
             isMatching: () => this.params.isMatching,
@@ -116,8 +132,8 @@ export class TestProxy {
         RESConfigLevelOverwrite: 'PROXY-RESPONSE-OVERWRITE',
         RESProxyLevelClear: null,
       },
-      onBeforeProxyRequest: (options: RequestOptions) => {
-        options.headers['ON_BEFORE_PROXY_HEADER'] = 'yes';
+      onBeforeProxyRequest: (options: RequestOptions, proxyHeaders: OutgoingHttpHeaders) => {
+        proxyHeaders['ON_BEFORE_PROXY_HEADER'] = 'yes';
       },
       onBeforeResponse: (res, outgoingHeaders) => {
         outgoingHeaders['ON_BEFORE_RESPONSE_HEADER'] = 'yes';

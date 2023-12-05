@@ -1,14 +1,19 @@
 import { UpstreamConfiguration } from './UpstreamConfiguration';
 import { Request } from './Request';
 import { Response } from './Response';
-import { ServerHttp2Stream } from 'http2';
-import { IncomingHttpHeaders } from 'http';
+import { ServerHttp2Stream } from 'node:http2';
+import { IncomingHttpHeaders } from 'node:http';
 
 export type ErrorHandler = (req: Request, res: Response, err: Error) => Promise<void>;
 export type Http2ErrorHandler = (stream: ServerHttp2Stream, headers: IncomingHttpHeaders, err: Error) => Promise<void>;
 
 export interface Configuration {
-  mode: 'HTTP' | 'HTTP2'
+  mode: 'HTTP' | 'HTTP2';
+
+  secure?: {
+    key: string;
+    cert: string;
+  }
 
   /**
    * Host port

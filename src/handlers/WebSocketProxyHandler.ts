@@ -80,7 +80,7 @@ export class WebSocketProxyHandler {
 
       /* istanbul ignore else */
       if (proxyConfiguration && proxyConfiguration.onBeforeProxyRequest) {
-        proxyConfiguration.onBeforeProxyRequest(options);
+        proxyConfiguration.onBeforeProxyRequest(options, options.headers);
       }
 
       const client = request(options);

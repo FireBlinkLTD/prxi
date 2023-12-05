@@ -89,6 +89,11 @@ export class Http2ProxyHandler {
           proxyConfiguration?.proxyRequestHeaders,
         );
 
+        /* istanbul ignore else */
+        if (proxyConfiguration && proxyConfiguration.onBeforeProxyRequest) {
+          proxyConfiguration.onBeforeProxyRequest(null, requestHeadersToSend);
+        }
+
         const proxyReq = client.request(requestHeadersToSend);
         proxyReq.on('response', (headers, flags) => {
           const headersToSet = RequestUtils.prepareProxyHeaders(
