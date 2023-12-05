@@ -129,6 +129,7 @@ export class FetchHelpers {
       const response = await fetch(url, {
         method,
         headers: {
+          'Connection': 'close',
           'content-type': 'application/json',
           'accept': 'application/json',
           ...headers
