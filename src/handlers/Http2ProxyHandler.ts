@@ -112,6 +112,10 @@ export class Http2ProxyHandler {
           stream.respond(headersToSet);
         });
 
+        proxyReq.once('end', () => {
+          resolve();
+        })
+
         proxyReq.pipe(stream).pipe(proxyReq);
       });
 

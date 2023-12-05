@@ -1,10 +1,11 @@
 import {suite, test} from '@testdeck/mocha';
 import { TestServer, TestProxy, assertReject, writeJson, TestProxyParams } from './helpers';
-import {deepEqual, equal, strictEqual, match} from 'assert';
-import { IncomingMessage, ServerResponse } from 'http';
+import {equal, strictEqual, match} from 'assert';
+import { IncomingHttpHeaders, IncomingMessage, ServerResponse } from 'http';
 import {io} from 'socket.io-client';
 import { WebSocketProxyHandler } from '../src/handlers';
 import { FetchHelpers } from './helpers/FetchHelper';
+import { ServerHttp2Stream, constants } from 'http2';
 
 abstract class BaseHttpProxyErrorSuite {
     constructor(private mode: 'HTTP' | 'HTTP2', private secure = false) {
@@ -72,12 +73,21 @@ abstract class BaseHttpProxyErrorSuite {
         match(err.message, /getaddrinfo .* non-existing-host/gi);
         await writeJson(res, JSON.stringify({customError}));
       };
+      params.customHttp2ErrorHandler = async (stream: ServerHttp2Stream, headers: IncomingHttpHeaders, err: Error): Promise<void> => {
+        match(err.message, /getaddrinfo .* non-existing-host/gi);
+        stream.respond({
+          [constants.HTTP2_HEADER_STATUS]: 200,
+          'content-type': 'application/json'
+        })
+        stream.write(JSON.stringify({customError}));
+        stream.end();
+      }
 
       this.proxy = new TestProxy(params);
       await this.proxy.start();
 
       const result = await new FetchHelpers(this.mode, this.secure).post(`${this.proxyUrl}/echo`, { test: true });
-      deepEqual(result.customError, customError);
+      strictEqual(result.customError, customError);
     }
 
     @test()
@@ -91,6 +101,10 @@ abstract class BaseHttpProxyErrorSuite {
         msg = err.message;
         throw err;
       };
+      params.customHttp2ErrorHandler = async (stream: ServerHttp2Stream, headers: IncomingHttpHeaders, err: Error): Promise<void> => {
+        msg = err.message;
+        throw err;
+      }
       params.isMatching = false;
 
       this.proxy = new TestProxy(params);
@@ -98,7 +112,9 @@ abstract class BaseHttpProxyErrorSuite {
 
       const result = await new FetchHelpers(this.mode, this.secure).post(`${this.proxyUrl}/missing`, { test: true });
       equal(result.error, 'Unexpected error occurred');
-      equal(msg, 'Missing RequestHandler configuration for the "POST:/missing" request');
+      equal(msg, this.mode === 'HTTP'
+        ? 'Missing RequestHandler configuration for the "POST:/missing" request'
+        : 'Missing RequestHandler configuration for the "POST:/missing" HTTP/2 request');
     }
 
     @test()
@@ -113,13 +129,19 @@ abstract class BaseHttpProxyErrorSuite {
         msg = err.message;
         throw err;
       };
+      params.customHttp2ErrorHandler = async (stream: ServerHttp2Stream, headers: IncomingHttpHeaders, err: Error): Promise<void> => {
+        msg = err.message;
+        throw err;
+      }
 
       this.proxy = new TestProxy(params);
       await this.proxy.start();
 
       const result = await new FetchHelpers(this.mode, this.secure).post(`${this.proxyUrl}/missing`, { test: true });
       equal(result.error, 'Unexpected error occurred');
-      equal(msg, 'Missing RequestHandler configuration for the "POST:/missing" request');
+      equal(msg, this.mode === 'HTTP'
+        ? 'Missing RequestHandler configuration for the "POST:/missing" request'
+        : 'Missing RequestHandler configuration for the "POST:/missing" HTTP/2 request');
     }
 
     @test()
@@ -128,6 +150,7 @@ abstract class BaseHttpProxyErrorSuite {
       params.mode = this.mode;
       params.secure = this.secure;
       params.customErrorHandler = false;
+      params.customHttp2ErrorHandler = false;
       params.isMatching = true;
       params.customWsHandler = false;
 
@@ -158,6 +181,7 @@ abstract class BaseHttpProxyErrorSuite {
       params.mode = this.mode;
       params.secure = this.secure;
       params.customErrorHandler = false;
+      params.customHttp2ErrorHandler = false;
       params.isMatching = true;
       params.customWsHandler = async () => {
         throw new Error('test');
@@ -188,6 +212,11 @@ abstract class BaseHttpProxyErrorSuite {
 
     @test()
     async erroredWebSocketHandler(): Promise<void> {
+      if (this.mode === 'HTTP2' && !this.secure) {
+        // invalid test for the HTTP/2 connection, as connection should be secured
+        return;
+      }
+
       const params = new TestProxyParams();
       params.mode = this.mode;
       params.secure = this.secure;
@@ -219,6 +248,11 @@ abstract class BaseHttpProxyErrorSuite {
 
     @test()
     async erroredUpstreamSocketHandler(): Promise<void> {
+      if (this.mode === 'HTTP2' && !this.secure) {
+        // invalid test for the HTTP/2 connection, as connection should be secured
+        return;
+      }
+
       const params = new TestProxyParams();
       params.mode = this.mode;
       params.secure = this.secure;
@@ -250,6 +284,11 @@ abstract class BaseHttpProxyErrorSuite {
 
     @test()
     async erroredIncomingSocketHandler(): Promise<void> {
+      if (this.mode === 'HTTP2' && !this.secure) {
+        // invalid test for the HTTP/2 connection, as connection should be secured
+        return;
+      }
+
       const params = new TestProxyParams();
       params.mode = this.mode;
       params.secure = this.secure;
@@ -281,6 +320,11 @@ abstract class BaseHttpProxyErrorSuite {
 
     @test()
     async wsNotSupportedByUpstream(): Promise<void> {
+      if (this.mode === 'HTTP2' && !this.secure) {
+        // invalid test for the HTTP/2 connection, as connection should be secured
+        return;
+      }
+
       // restart server with WS disabled
       await this.server.stop();
       this.server = new TestServer(this.mode, this.secure, false);
@@ -326,9 +370,16 @@ export class Http1ProxyErrorSuiteSecure extends BaseHttpProxyErrorSuite {
   }
 }
 
-// @suite()
-// export class Http2ProxyErrorSuite extends BaseHttpProxyErrorSuite {
-//   constructor() {
-//     super('HTTP2');
-//   }
-// }
+@suite()
+export class Http2ProxyErrorSuite extends BaseHttpProxyErrorSuite {
+  constructor() {
+    super('HTTP2');
+  }
+}
+
+@suite()
+export class Http2ProxyErrorSuiteSecure extends BaseHttpProxyErrorSuite {
+  constructor() {
+    super('HTTP2', true);
+  }
+}

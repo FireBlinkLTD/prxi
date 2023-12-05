@@ -222,7 +222,7 @@ export class Prxi {
               headers,
               async (proxyConfiguration?: ProxyRequestConfiguration): Promise<void> => {
                 this.logInfo(`[${requestId}] [Prxi] Handling HTTP/2 proxy request for path: ${path}`);
-                proxy.http2.proxy(requestId, session, stream, headersToSet, proxyConfiguration);
+                await proxy.http2.proxy(requestId, session, stream, headersToSet, proxyConfiguration);
               },
               <HttpMethod> method,
               path,

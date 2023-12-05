@@ -1,6 +1,6 @@
 import { IncomingMessage, ServerResponse } from 'node:http';
 import { Duplex } from 'stream';
-import { ErrorHandler, Prxi, ProxyRequest, WebSocketHandlerFunction, WebSocketHandlerConfig, Configuration, ProxyRequestConfiguration } from '../../src';
+import { ErrorHandler, Prxi, ProxyRequest, WebSocketHandlerFunction, WebSocketHandlerConfig, Configuration, ProxyRequestConfiguration, Http2ErrorHandler } from '../../src';
 import { TestServer } from './TestServer';
 import { RequestOptions } from 'node:https';
 import { OutgoingHttpHeaders } from 'node:http2';
@@ -11,6 +11,7 @@ export class TestProxyParams {
   configOverride?: Partial<Configuration>;
   host?: string;
   customErrorHandler?: ErrorHandler | false;
+  customHttp2ErrorHandler?: Http2ErrorHandler | false;
   isMatching?: boolean | null;
   customWsHandler?: WebSocketHandlerFunction | false;
   prefix?: string;
@@ -83,7 +84,7 @@ export class TestProxy {
       }],
 
       errorHandler: this.params.customErrorHandler ? this.params.customErrorHandler : (this.params.customErrorHandler !== false ? this.errorHandler.bind(this) : null),
-      http2ErrorHandler: this.params.customErrorHandler ? this.params.customErrorHandler : (this.params.customErrorHandler !== false ? this.errorHandler.bind(this) : null),
+      http2ErrorHandler: this.params.customHttp2ErrorHandler ? this.params.customHttp2ErrorHandler : (this.params.customHttp2ErrorHandler !== false ? this.errorHandler.bind(this) : null),
       logInfo: console.log,
       logError: console.error,
       proxyRequestHeaders: {
