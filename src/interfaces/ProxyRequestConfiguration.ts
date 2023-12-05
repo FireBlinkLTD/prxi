@@ -1,5 +1,6 @@
 import { OutgoingHttpHeaders, RequestOptions, ServerResponse } from 'http';
 import { HttpMethod } from './RequestHandler';
+import { Response } from './Response';
 
 export interface ProxyRequestConfiguration {
   // Request url (path)
@@ -33,5 +34,5 @@ export interface ProxyRequestConfiguration {
    * @param outgoingHeaders
    * @returns
    */
-  onBeforeResponse?: (res: ServerResponse, outgoingHeaders: OutgoingHttpHeaders) => void;
+  onBeforeResponse?: (res: Response, outgoingHeaders: OutgoingHttpHeaders) => void;
 }

@@ -1,15 +1,27 @@
-import { IncomingMessage, ServerResponse } from 'http';
 import { Socket } from 'net';
 import { ProxyRequestConfiguration } from './ProxyRequestConfiguration';
+import { Request } from './Request';
+import { Response } from './Response';
+import { OutgoingHttpHeaders, ServerHttp2Stream } from 'http2';
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'OPTIONS' | 'HEAD';
 export type IsMatchingRequestFunction = (method: HttpMethod, path: string, context: Record<string, any>) => boolean;
 export type IsMatchingWebSocketFunction = (path: string, context: Record<string, any>) => boolean;
 export type ProxyRequest = (configuration?: ProxyRequestConfiguration) => Promise<void>;
 export type WebSocketProxyCancelRequest = (status: number, description: string) => void;
-export type HandleFunction = (
-  req: IncomingMessage,
-  res: ServerResponse,
+
+export type HttpHandleFunction = (
+  req: Request,
+  res: Response,
+  proxyRequest: ProxyRequest,
+  method: HttpMethod,
+  path: string,
+  context: Record<string, any>
+) => Promise<void>;
+
+export type Http2HandleFunction = (
+  stream: ServerHttp2Stream,
+  headers: OutgoingHttpHeaders,
   proxyRequest: ProxyRequest,
   method: HttpMethod,
   path: string,
@@ -17,7 +29,7 @@ export type HandleFunction = (
 ) => Promise<void>;
 
 export type WebSocketHandlerFunction = (
-  req: IncomingMessage,
+  req: Request,
   socket: Socket,
   head: Buffer,
   proxyRequest: ProxyRequest,
@@ -34,10 +46,18 @@ export interface WebSocketHandlerConfig {
   handle: WebSocketHandlerFunction;
 }
 
-export interface RequestHandlerConfig {
+export interface HttpRequestHandlerConfig {
   // Check if request method and path should be processed by current RequestHandler
   isMatching: IsMatchingRequestFunction;
 
   // Incoming request handler
-  handle: HandleFunction;
+  handle: HttpHandleFunction;
+}
+
+export interface Http2RequestHandlerConfig {
+  // Check if request method and path should be processed by current RequestHandler
+  isMatching: IsMatchingRequestFunction;
+
+  // Incoming request handler
+  handle: Http2HandleFunction;
 }

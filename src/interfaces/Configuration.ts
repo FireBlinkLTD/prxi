@@ -1,9 +1,15 @@
-import { IncomingMessage, ServerResponse } from 'http';
 import { UpstreamConfiguration } from './UpstreamConfiguration';
+import { Request } from './Request';
+import { Response } from './Response';
+import { ServerHttp2Stream } from 'http2';
+import { IncomingHttpHeaders } from 'http';
 
-export type ErrorHandler = (req: IncomingMessage, res: ServerResponse, err: Error) => Promise<void>;
+export type ErrorHandler = (req: Request, res: Response, err: Error) => Promise<void>;
+export type Http2ErrorHandler = (stream: ServerHttp2Stream, headers: IncomingHttpHeaders, err: Error) => Promise<void>;
 
 export interface Configuration {
+  mode: 'HTTP' | 'HTTP2'
+
   /**
    * Host port
    */
@@ -24,6 +30,11 @@ export interface Configuration {
    * Request error handler
    */
   errorHandler?: ErrorHandler;
+
+  /**
+   * HTTP/2 Error handler
+   */
+  http2ErrorHandler?: Http2ErrorHandler;
 
   /**
    * Proxy request headers to add/replace/remove

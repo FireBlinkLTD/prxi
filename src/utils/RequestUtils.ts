@@ -1,4 +1,6 @@
-import { OutgoingHttpHeaders, OutgoingMessage, IncomingMessage, IncomingHttpHeaders } from "http";
+import { IncomingHttpHeaders } from "http";
+import { OutgoingHttpHeaders } from "http2";
+import { Request, Response } from "../interfaces";
 
 export class RequestUtils {
   /**
@@ -6,14 +8,22 @@ export class RequestUtils {
    * @param req
    * @returns
    */
-  public static getPath(req: IncomingMessage): string {
-    let path = req.url;
-    const attributesIndex = path.indexOf('?');
+  public static getPath(req: Request): string {
+    return RequestUtils.getPathFromStr(req.url);
+  }
+
+  /**
+   * Extract path from string
+   * @param str
+   * @returns
+   */
+  public static getPathFromStr(str: string): string {
+    const attributesIndex = str.indexOf('?');
     if (attributesIndex > 0) {
-      path = path.substring(0, attributesIndex);
+      str = str.substring(0, attributesIndex);
     }
 
-    return path;
+    return str;
   }
 
   /**
@@ -87,7 +97,7 @@ export class RequestUtils {
    * @param res
    * @param headers
    */
-  public static updateResponseHeaders(res: OutgoingMessage, headers: OutgoingHttpHeaders): void {
+  public static updateResponseHeaders(res: Response, headers: OutgoingHttpHeaders): void {
     // remove all existing headers
     for (const key of res.getHeaderNames()) {
       res.removeHeader(key);

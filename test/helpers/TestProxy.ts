@@ -11,6 +11,7 @@ export class TestProxyParams {
   isMatching?: boolean | null;
   customWsHandler?: WebSocketHandlerFunction | false;
   prefix?: string;
+  mode: 'HTTP' | 'HTTP2';
 
   /**
    * Initialize default values
@@ -28,11 +29,8 @@ export class TestProxy {
   private proxy: Prxi;
 
   constructor(
-    private params?: TestProxyParams
+    private params: TestProxyParams
   ) {
-    if (!this.params) {
-      this.params = new TestProxyParams();
-    }
     this.params.init();
   }
 
@@ -45,8 +43,11 @@ export class TestProxy {
       handle: this.params.customWsHandler ? this.params.customWsHandler : (this.params.customWsHandler !==false ? this.wsHandler.bind(this) : null),
     };
 
+    console.log(`-> [${this.params.mode}] Starting Prxi`);
+
     // instantiate
     this.proxy = new Prxi({
+      mode: this.params.mode || 'HTTP',
       port: TestProxy.PORT,
       upstream: [{
         target: `http://${this.params.host}:${TestServer.PORT}${this.params.prefix}`,
@@ -56,10 +57,17 @@ export class TestProxy {
             handle: this.handleOthers.bind(this),
           }
         ] : null,
+        http2RequestHandlers: this.params.isMatching !== null ? [
+          {
+            isMatching: () => this.params.isMatching,
+            handle: this.handleOthers.bind(this),
+          }
+        ] : null,
         webSocketHandlers: wsh.handle ? [wsh] : null,
       }],
 
       errorHandler: this.params.customErrorHandler ? this.params.customErrorHandler : (this.params.customErrorHandler !== false ? this.errorHandler.bind(this) : null),
+      http2ErrorHandler: this.params.customErrorHandler ? this.params.customErrorHandler : (this.params.customErrorHandler !== false ? this.errorHandler.bind(this) : null),
       logInfo: console.log,
       logError: console.error,
       proxyRequestHeaders: {

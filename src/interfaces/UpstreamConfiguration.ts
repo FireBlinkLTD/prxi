@@ -1,5 +1,5 @@
-import { ErrorHandler } from "./Configuration";
-import { RequestHandlerConfig, WebSocketHandlerConfig } from "./RequestHandler";
+import { ErrorHandler, Http2ErrorHandler } from "./Configuration";
+import { HttpRequestHandlerConfig, Http2RequestHandlerConfig, WebSocketHandlerConfig } from "./RequestHandler";
 
 export interface UpstreamConfiguration {
   /**
@@ -24,14 +24,24 @@ export interface UpstreamConfiguration {
   responseHeaders?: Record<string, string | string[] | null>;
 
   /**
-   * Request error handler
+   * HTTP/1.1 Request error handler
    */
   errorHandler?: ErrorHandler;
 
   /**
-   * Request handlers
+   * HTTP/1.1 Request handlers
    */
-  requestHandlers?: Array<RequestHandlerConfig>;
+  requestHandlers?: Array<HttpRequestHandlerConfig>;
+
+  /**
+   * HTTP/2 Error handler
+   */
+  http2ErrorHandler?: Http2ErrorHandler;
+
+  /**
+   * HTTP/2 Request handlers
+   */
+  http2RequestHandlers?: Array<Http2RequestHandlerConfig>;
 
   /**
    * WebSocket request handler
