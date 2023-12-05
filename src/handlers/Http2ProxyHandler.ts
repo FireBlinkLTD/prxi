@@ -70,8 +70,7 @@ export class Http2ProxyHandler {
     await new Promise<void>((resolve, reject) => {
       const client = this.getOrCreateConnection(session, target);
 
-      //client.setTimeout(2000);
-      client.once('connect', () => {
+      const handle = () => {
         this.logInfo(`[${requestId}] [Http2ProxyHandler] Connected`);
 
         const path = RequestUtils.concatPath(initialPath, headers[constants.HTTP2_HEADER_PATH].toString());
@@ -95,6 +94,12 @@ export class Http2ProxyHandler {
         }
 
         const proxyReq = client.request(requestHeadersToSend);
+
+        proxyReq.once('error', (err) => {
+          this.logInfo(`[${requestId}] [Http2ProxyHandler] Proxy request failed, error: ${err.message}`);
+          reject(err);
+        });
+
         proxyReq.on('response', (headers, flags) => {
           const headersToSet = RequestUtils.prepareProxyHeaders(
             headers,
@@ -117,9 +122,20 @@ export class Http2ProxyHandler {
         })
 
         proxyReq.pipe(stream).pipe(proxyReq);
+      }
+
+      if (!client.connecting && !client.closed) {
+        return handle();
+      }
+
+      //client.setTimeout(2000);
+      client.once('connect', () => {
+        handle();
       });
 
       client.once('error', (err) => {
+        client.close();
+        this.connections.delete(session);
         this.logInfo(`[${requestId}] [Http2ProxyHandler] Proxy request failed, error: ${err.message}`);
         reject(err);
       });

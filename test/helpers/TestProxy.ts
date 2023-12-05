@@ -15,7 +15,7 @@ export class TestProxyParams {
   isMatching?: boolean | null;
   customWsHandler?: WebSocketHandlerFunction | false;
   prefix?: string;
-  mode: 'HTTP' | 'HTTP2';
+  mode: 'HTTP' | 'HTTP2' | 'INVALID';
   secure: boolean;
   secureSettings?: {
     key: string,
@@ -63,7 +63,7 @@ export class TestProxy {
 
     // instantiate
     this.proxy = new Prxi({
-      mode: this.params.mode || 'HTTP',
+      mode: <any> this.params.mode,
       port: TestProxy.PORT,
       secure: this.params.secureSettings,
       upstream: [{

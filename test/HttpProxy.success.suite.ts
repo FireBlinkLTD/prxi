@@ -60,7 +60,20 @@ abstract class BaseHttpProxySuccessSuite {
     }
 
     const result = await new FetchHelpers(this.mode, this.secure).post(`${this.proxyUrl}/echo`, testData);
-    deepEqual(result, testData);
+    deepEqual(result.data, testData);
+  }
+
+  @test()
+  async multipleEchoRequests(): Promise<void> {
+    await this.initProxy();
+
+    const testData = [];
+    for (let i = 0; i < 1000 * 1000; i++) {
+      testData.push('Iteration - ' + i);
+    }
+
+    const result = await new FetchHelpers(this.mode, this.secure, 2).post(`${this.proxyUrl}/echo`, testData);
+    deepEqual(result.data, testData);
   }
 
   @test()
@@ -80,7 +93,7 @@ abstract class BaseHttpProxySuccessSuite {
     const result = await new FetchHelpers(this.mode, this.secure).post(`${this.proxyUrl}/echo`, testData, {
       'Connection': 'keep-alive',
     });
-    deepEqual(result, testData);
+    deepEqual(result.data, testData);
   }
 
   @test()
@@ -102,7 +115,7 @@ abstract class BaseHttpProxySuccessSuite {
     }
 
     const result = await new FetchHelpers(this.mode, this.secure).post(`${this.proxyUrl}/echo`, testData);
-    deepEqual(result, testData);
+    deepEqual(result.data, testData);
   }
 
   @test()

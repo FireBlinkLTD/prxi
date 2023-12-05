@@ -2,7 +2,7 @@ import { connect, constants } from 'node:http2';
 import path = require('node:path');
 
 export class FetchHelpers {
-  constructor(private mode: 'HTTP' | 'HTTP2', private secure: boolean) {}
+  constructor(private mode: 'HTTP' | 'HTTP2', private secure: boolean, private repeat = 1) {}
 
   public fixUrl(url: string): string {
     if (!this.secure) {
@@ -46,27 +46,7 @@ export class FetchHelpers {
     data: any,
     headers: Record<string, string>,
   }> {
-    try {
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          ...headers
-        },
-      });
-
-      const responseHeaders: Record<string, string> = {};
-      for (const header of response.headers.keys()) {
-        responseHeaders[header] = response.headers.get(header).toString();
-      }
-
-      return {
-        data: await response.json(),
-        headers: responseHeaders,
-      };
-    } catch (err) {
-      console.error(err);
-      throw err;
-    }
+    return await this.makeHttp1Request('GET', url, headers);
   }
 
    /**
@@ -79,40 +59,11 @@ export class FetchHelpers {
     data: any,
     headers: Record<string, string>,
   }> {
-    return new Promise<any>((res, rej) => {
-      try {
-        const { origin, pathname, search } = new URL(url);
-        const client = connect(origin);
-        const req = client.request({
-          [constants.HTTP2_HEADER_PATH]: `${pathname}${search}`,
-          [constants.HTTP2_HEADER_METHOD]: constants.HTTP2_METHOD_GET,
-          ...headers
-        });
-
-        let responseHeaders: Record<string, string> = {};
-        req.on('response', (headers, flags) => {
-          for (const header of Object.keys(headers)) {
-            responseHeaders[header] = headers[header].toString();
-          }
-        });
-
-        req.setEncoding('utf8');
-        let data = '';
-        req.on('data', (chunk) => {
-            data += chunk;
-        });
-        req.on('end', () => {
-            res({
-              data: JSON.parse(data),
-              headers: responseHeaders,
-            });
-            client.close();
-        });
-        req.end();
-      } catch (e) {
-        rej(e);
-      }
-    });
+    return await this.makeHttp2Request(
+      constants.HTTP2_METHOD_GET,
+      url,
+      headers,
+    );
   }
 
   /**
@@ -122,7 +73,10 @@ export class FetchHelpers {
    * @param headers
    * @returns
    */
-  async post(url: string, data: unknown, headers: Record<string, string> = {}): Promise<any> {
+  async post(url: string, data: unknown, headers: Record<string, string> = {}): Promise<{
+    data: any,
+    headers: Record<string, string>,
+  }> {
     url = this.fixUrl(url);
     console.log(`-> [${this.mode}] Making POST request to ${url}`);
 
@@ -144,23 +98,11 @@ export class FetchHelpers {
    * @param headers
    * @returns
    */
-  private async postHttp1(url: string, data: unknown, headers: Record<string, string>): Promise<any> {
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'accept': 'application/json',
-          ...headers
-        },
-        body: JSON.stringify(data),
-      });
-
-      return response.json();
-    } catch (err) {
-      console.error(err);
-      throw err;
-    }
+  private async postHttp1(url: string, data: unknown, headers: Record<string, string>): Promise<{
+    data: any,
+    headers: Record<string, string>,
+  }> {
+    return await this.makeHttp1Request('POST', url, headers, data);
   }
 
   /**
@@ -170,24 +112,68 @@ export class FetchHelpers {
    * @param headers
    * @returns
    */
-    private async postHttp2(url: string, data: unknown, headers: Record<string, string>): Promise<any> {
-      const buffer = Buffer.from(JSON.stringify(data));
+  private async postHttp2(url: string, data: unknown, headers: Record<string, string>): Promise<{
+    data: any,
+    headers: Record<string, string>,
+  }> {
+    return await this.makeHttp2Request(
+      constants.HTTP2_METHOD_POST,
+      url,
+      headers,
+      data
+    );
+  }
 
-      return new Promise<any>((res, rej) => {
-        try {
-          const { origin, pathname, search } = new URL(url);
-          const client = connect(origin);
+  private async makeHttp1Request(method: string, url: string, headers: Record<string, string>, data?: unknown): Promise<any> {
+    try {
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'content-type': 'application/json',
+          'accept': 'application/json',
+          ...headers
+        },
+        body: data ? JSON.stringify(data) : undefined,
+      });
+
+      const responseHeaders: Record<string, string> = {};
+      for (const header of response.headers.keys()) {
+        responseHeaders[header] = response.headers.get(header).toString();
+      }
+
+      return {
+        data: await response.json(),
+        headers: responseHeaders,
+      };
+    } catch (err) {
+      console.error(err);
+      throw err;
+    }
+  }
+
+  private async makeHttp2Request(method: string, url: string, headers: Record<string, string>, data?: unknown): Promise<any> {
+    const buffer = data ? Buffer.from(JSON.stringify(data)) : undefined;
+
+    return new Promise<any>((res, rej) => {
+      let count = 0;
+      try {
+        const { origin, pathname, search } = new URL(url);
+        const client = connect(origin);
+
+        const makeRequest = () => {
+          console.log(`-> Making request (${count + 1} / ${this.repeat})`)
           const req = client.request({
             [constants.HTTP2_HEADER_PATH]: `${pathname}${search}`,
-            [constants.HTTP2_HEADER_METHOD]: constants.HTTP2_METHOD_POST,
+            [constants.HTTP2_HEADER_METHOD]: method,
             'content-type': 'application/json',
             'accept': 'application/json',
             ...headers,
           });
 
-          req.on('response', (headers, flags) => {
-            for (const name in headers) {
-                console.log(`${name}: ${headers[name]}`);
+          let responseHeaders: Record<string, string> = {};
+          req.once('response', (headers, flags) => {
+            for (const header of Object.keys(headers)) {
+              responseHeaders[header] = headers[header].toString();
             }
           });
 
@@ -197,16 +183,31 @@ export class FetchHelpers {
             data += chunk;
           });
 
-          req.on('end', () => {
-            res(JSON.parse(data));
-            client.close();
+          req.once('end', () => {
+            count++;
+
+            if (count === this.repeat) {
+              res({
+                data: JSON.parse(data),
+                headers: responseHeaders,
+              });
+
+              client.close();
+            } else {
+              makeRequest();
+            }
           });
 
-          req.write(buffer);
+          if (buffer) {
+            req.write(buffer);
+          }
           req.end();
-        } catch (e) {
-          rej(e);
         }
-      });
-    }
+
+        makeRequest();
+      } catch (e) {
+        rej(e);
+      }
+    });
+  }
 }

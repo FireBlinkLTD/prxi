@@ -1,6 +1,6 @@
 import {suite, test} from '@testdeck/mocha';
 import { TestServer, TestProxy, assertReject, writeJson, TestProxyParams } from './helpers';
-import {equal, strictEqual, match} from 'assert';
+import {equal, strictEqual, match, ok} from 'assert';
 import { IncomingHttpHeaders, IncomingMessage, ServerResponse } from 'http';
 import {io} from 'socket.io-client';
 import { WebSocketProxyHandler } from '../src/handlers';
@@ -36,6 +36,24 @@ abstract class BaseHttpProxyErrorSuite {
     }
 
     @test()
+    async invalidMode() {
+      const params = new TestProxyParams();
+      params.mode = 'INVALID';
+      params.secure = this.secure;
+
+      let err;
+      try {
+        this.proxy = new TestProxy(params);
+        await this.proxy.start();
+      } catch (e) {
+        err = e;
+      }
+
+      ok(err);
+      strictEqual(err.message, 'Invalid mode provided inside the configuration object "INVALID", expected HTTP or HTTP2')
+    }
+
+    @test()
     async doubleProxyStop() {
       const params = new TestProxyParams();
       params.mode = this.mode;
@@ -58,7 +76,7 @@ abstract class BaseHttpProxyErrorSuite {
       await this.proxy.start();
 
       const result = await new FetchHelpers(this.mode, this.secure).post(`${this.proxyUrl}/echo`, { test: true });
-      equal(result.error, 'Unexpected error occurred');
+      equal(result.data.error, 'Unexpected error occurred');
     }
 
     @test()
@@ -87,7 +105,7 @@ abstract class BaseHttpProxyErrorSuite {
       await this.proxy.start();
 
       const result = await new FetchHelpers(this.mode, this.secure).post(`${this.proxyUrl}/echo`, { test: true });
-      strictEqual(result.customError, customError);
+      strictEqual(result.data.customError, customError);
     }
 
     @test()
@@ -111,7 +129,7 @@ abstract class BaseHttpProxyErrorSuite {
       await this.proxy.start();
 
       const result = await new FetchHelpers(this.mode, this.secure).post(`${this.proxyUrl}/missing`, { test: true });
-      equal(result.error, 'Unexpected error occurred');
+      equal(result.data.error, 'Unexpected error occurred');
       equal(msg, this.mode === 'HTTP'
         ? 'Missing RequestHandler configuration for the "POST:/missing" request'
         : 'Missing RequestHandler configuration for the "POST:/missing" HTTP/2 request');
@@ -138,7 +156,7 @@ abstract class BaseHttpProxyErrorSuite {
       await this.proxy.start();
 
       const result = await new FetchHelpers(this.mode, this.secure).post(`${this.proxyUrl}/missing`, { test: true });
-      equal(result.error, 'Unexpected error occurred');
+      equal(result.data.error, 'Unexpected error occurred');
       equal(msg, this.mode === 'HTTP'
         ? 'Missing RequestHandler configuration for the "POST:/missing" request'
         : 'Missing RequestHandler configuration for the "POST:/missing" HTTP/2 request');
