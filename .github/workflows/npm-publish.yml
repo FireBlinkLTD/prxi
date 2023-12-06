@@ -8,6 +8,7 @@ on:
 jobs:
   build_and_test:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
@@ -36,6 +37,7 @@ jobs:
   build_and_publish:
     needs: [build_and_test]
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
