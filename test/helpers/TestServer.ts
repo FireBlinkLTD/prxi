@@ -17,6 +17,7 @@ export class TestServer {
     key: string,
     cert: string,
   }
+  public failHttp2Request = false;
 
   constructor(private mode: 'HTTP' | 'HTTP2', private secure: boolean, private wsEnabled: boolean, private prefix: string = '') {
     if (this.secure) {
@@ -98,6 +99,12 @@ export class TestServer {
           const method = headers[constants.HTTP2_HEADER_METHOD].toString();
 
           const process = (data?: any) => {
+            if (this.failHttp2Request) {
+              console.log('-> stream destroyed');
+              stream.destroy(new Error('fail'));
+              return;
+            }
+
             if (path === `${this.prefix}/echo`) {
               return this.http2respond(stream, 200, data);
             }

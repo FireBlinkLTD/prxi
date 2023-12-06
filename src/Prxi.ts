@@ -101,6 +101,7 @@ export class Prxi {
 
     // register default HTTP/2 error handler
     if (!http2ErrorHandler) {
+      /* istanbul ignore next */
       http2ErrorHandler = (stream: ServerHttp2Stream, headers: IncomingHttpHeaders, err: Error): Promise<void> => {
         /* istanbul ignore next */
         return new Promise<void>((res, rej) => rej(err));
@@ -121,6 +122,7 @@ export class Prxi {
       if (this.configuration.mode === 'HTTP2') {
         http2ProxyHandler = new Http2ProxyHandler(
           this.logInfo,
+          this.logError,
           this.configuration,
           upstream,
         );

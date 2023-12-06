@@ -197,10 +197,14 @@ export class FetchHelpers {
 
           req.once('end', () => {
             if (count + 1 === this.repeat) {
-              res({
-                data: JSON.parse(data),
-                headers: responseHeaders,
-              });
+              try {
+                res({
+                  data: data ? JSON.parse(data) : undefined,
+                  headers: responseHeaders,
+                });
+              } catch (e) {
+                rej(e);
+              }
 
               client.close();
             } else {

@@ -11,6 +11,7 @@ export class Http2ProxyHandler {
 
   constructor(
     private logInfo: (msg: string) => void,
+    private logError: (message?: any, ...params: any[]) => void,
     private configuration: Configuration,
     private upstream: UpstreamConfiguration,
   ) {
@@ -25,15 +26,33 @@ export class Http2ProxyHandler {
    */
   private getOrCreateConnection(session: Http2Session, target: string): ClientHttp2Session {
     let connection = this.connections.get(session);
-    if (connection) {
+    if (connection && !connection.closed) {
       return connection;
     }
 
     connection = connect(target);
     this.connections.set(session, connection);
 
+    // const interval = setInterval(() => {
+    //   if (connection.closed) {
+    //     session.close();
+    //     clearInterval(interval);
+    //     return;
+    //   }
+
+    //   this.logInfo(`[Http2ProxyHandler] Ping ${target}`);
+    //   connection.ping((err) => {
+    //     if (err) {
+    //       this.logError(`[Http2ProxyHandler] Ping failed ${target}`, err);
+    //       this.closeConnection(session, connection);
+    //     } else {
+    //       this.logInfo(`[Http2ProxyHandler] Ping success`);
+    //     }
+    //   });
+    // }, 5000);
+
     connection.on('close', () => {
-      this.connections.delete(session);
+      this.closeConnection(session, connection);
     });
 
     session.on('close', () => {
@@ -50,8 +69,10 @@ export class Http2ProxyHandler {
    * @param connection
    */
   private closeConnection(session: Http2Session, connection: ClientHttp2Session): void {
-    this.connections.delete(session);
-    connection.close();
+    if (this.connections.has(session)) {
+      this.connections.delete(session);
+      connection.close();
+    }
   }
 
   /**
@@ -74,7 +95,7 @@ export class Http2ProxyHandler {
     let target = proxyConfiguration.target || this.upstream.target;
     const initialPath = new URL(target).pathname;
 
-    this.logInfo(`[${requestId}] [Http2ProxyHandler] Processing proxy request with method to ${target}`);
+    this.logInfo(`[${requestId}] [Http2ProxyHandler] Processing proxy request to ${target}`);
 
     await new Promise<void>((resolve, reject) => {
       const client = this.getOrCreateConnection(session, target);
@@ -105,7 +126,7 @@ export class Http2ProxyHandler {
         const proxyReq = client.request(requestHeadersToSend);
 
         proxyReq.once('error', (err) => {
-          this.logInfo(`[${requestId}] [Http2ProxyHandler] Proxy request failed, error: ${err.message}`);
+          this.logError(`[${requestId}] [Http2ProxyHandler] Proxy request failed, error: ${err.message}`);
           reject(err);
         });
 
@@ -137,19 +158,21 @@ export class Http2ProxyHandler {
         return handle();
       }
 
+      /* istanbul ignore else */
       if (this.configuration.proxyRequestTimeout) {
         client.setTimeout(this.configuration.proxyRequestTimeout, () => {
           this.closeConnection(session, client);
-          this.logInfo(`[${requestId}] [Http2ProxyHandler] Proxy request timeout`);
+          this.logError(`[${requestId}] [Http2ProxyHandler] Proxy request timeout`);
         });
       }
+
       client.once('connect', () => {
         handle();
       });
 
       client.once('error', (err) => {
         this.closeConnection(session, client);
-        this.logInfo(`[${requestId}] [Http2ProxyHandler] Proxy request failed, error: ${err.message}`);
+        this.logError(`[${requestId}] [Http2ProxyHandler] Proxy request failed, error: ${err.message}`);
         reject(err);
       });
     });
