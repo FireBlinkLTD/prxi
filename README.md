@@ -56,7 +56,7 @@ const proxy = new Prxi({
   errorHandler,
 
   // optional custom error handler for HTTP/2 connection
-  // only in use when mode =
+  // only in use when mode is HTTP2
   http2ErrorHandler,
 
   // optional additional headers to add or remove from the upstream request
