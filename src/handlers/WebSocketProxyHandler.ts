@@ -117,7 +117,7 @@ export class WebSocketProxyHandler {
               this.upstream.proxyRequestHeaders,
               proxyConfiguration.proxyResponseHeaders,
             );
-            socket.write(WebSocketUtils.prepareRawHeadersString(`HTTP/${res.httpVersion} ${res.statusCode} ${res.statusMessage}`, headersToSet));
+            socket.write(WebSocketUtils.prepareRawHeadersString(`HTTP/1.1 ${res.statusCode} ${res.statusMessage}`, headersToSet));
             res.pipe(socket);
           }
 
@@ -169,7 +169,7 @@ export class WebSocketProxyHandler {
             this.upstream.proxyRequestHeaders,
             proxyConfiguration.proxyResponseHeaders,
           );
-          socket.write(WebSocketUtils.prepareRawHeadersString(`HTTP/${req.httpVersion} 101 Switching Protocols`, headersToSet));
+          socket.write(WebSocketUtils.prepareRawHeadersString(`HTTP/1.1 101 Switching Protocols`, headersToSet));
           proxySocket.pipe(socket).pipe(proxySocket);
         });
       });
