@@ -1,4 +1,4 @@
-import {suite, test} from '@testdeck/mocha';
+import {suite, test, context} from '@testdeck/mocha';
 import { TestServer, TestProxy, assertReject, writeJson, TestProxyParams } from './helpers';
 import {equal, strictEqual, match, ok} from 'assert';
 import { IncomingHttpHeaders, IncomingMessage, ServerResponse } from 'http';
@@ -9,7 +9,6 @@ import { ServerHttp2Stream, constants } from 'http2';
 
 abstract class BaseHttpProxyErrorSuite {
     constructor(private mode: 'HTTP' | 'HTTP2', private secure = false) {
-      console.log(`========= ${mode} ${secure ? '[secure]' : ''} =========`)
     }
 
     private server: TestServer = null;
@@ -23,6 +22,7 @@ abstract class BaseHttpProxyErrorSuite {
      * Before hook
      */
     async before(): Promise<void> {
+      console.log(`========= [${this.mode}]${this.secure ? ' [secure]' : ''} ${this[context].test.title} =========`);
       this.server = new TestServer(this.mode, this.secure, true);
       await this.server.start();
     }
@@ -33,6 +33,7 @@ abstract class BaseHttpProxyErrorSuite {
     async after(): Promise<void> {
       await this.proxy?.stop();
       await this.server.stop();
+      console.log(`========= [${this.mode}]${this.secure ? ' [secure]' : ''} ${this[context].test.title} =========`);
     }
 
     @test()

@@ -27,6 +27,7 @@ export interface Configuration {
 
   /**
    * Optional proxy request timeout duration
+   * For HTTP/2 connection it declares max idle time for the connection
    * @default 60000 - 1 minute
    */
   proxyRequestTimeout?: number;

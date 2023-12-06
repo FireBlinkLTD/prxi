@@ -2,7 +2,7 @@ import { connect, constants } from 'node:http2';
 import path = require('node:path');
 
 export class FetchHelpers {
-  constructor(private mode: 'HTTP' | 'HTTP2', private secure: boolean, private repeat = 1) {}
+  constructor(private mode: 'HTTP' | 'HTTP2', private secure: boolean, private repeat = 1, private delayBetweenRepeats = 0) {}
 
   public fixUrl(url: string): string {
     if (!this.secure) {
@@ -159,10 +159,21 @@ export class FetchHelpers {
       let count = 0;
       try {
         const { origin, pathname, search } = new URL(url);
-        const client = connect(origin);
+        let client = connect(origin);
+
+        client.on('close', () => {
+          console.log(`-> Connection closed (${count + 1} / ${this.repeat})`);
+        })
 
         const makeRequest = () => {
-          console.log(`-> Making request (${count + 1} / ${this.repeat})`)
+          console.log(`-> Making request (${count + 1} / ${this.repeat})`);
+          // if client closed, reconnect
+          if (client.closed) {
+            client.close();
+            console.log(`-> Reconnecting for request (${count + 1} / ${this.repeat})`);
+            client = connect(origin);
+          }
+
           const req = client.request({
             [constants.HTTP2_HEADER_PATH]: `${pathname}${search}`,
             [constants.HTTP2_HEADER_METHOD]: method,
@@ -185,9 +196,7 @@ export class FetchHelpers {
           });
 
           req.once('end', () => {
-            count++;
-
-            if (count === this.repeat) {
+            if (count + 1 === this.repeat) {
               res({
                 data: JSON.parse(data),
                 headers: responseHeaders,
@@ -195,7 +204,10 @@ export class FetchHelpers {
 
               client.close();
             } else {
-              makeRequest();
+              count++;
+              setTimeout(() => {
+                makeRequest();
+              }, this.delayBetweenRepeats);
             }
           });
 

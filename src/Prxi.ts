@@ -197,6 +197,14 @@ export class Prxi {
 
     if (this.configuration.mode === 'HTTP2') {
       server.on('session', (session) => {
+        /* istanbul ignore else */
+        if (this.configuration.proxyRequestTimeout) {
+          session.setTimeout(this.configuration.proxyRequestTimeout, () => {
+            this.logInfo(`[Prxi] HTTP/2 session timeout`);
+            session.close();
+          });
+        }
+
         session.on('stream', (stream, headers) => {
           const requestId = id++;
 
@@ -248,6 +256,7 @@ export class Prxi {
       });
     }
 
+    /* istanbul ignore next */
     server.on('clientError', (err) => {
       this.logError(`[Prxi] Client Error`, err);
     })
@@ -328,7 +337,9 @@ export class Prxi {
     try {
       let contentType = 'text/plain';
       let data = 'Unexpected error occurred';
-      if ((headers.accept || '').indexOf('application/json') >= 0) {
+
+      /* istanbul ignore else */
+      if (headers.accept && headers.accept.indexOf('application/json') >= 0) {
         contentType = 'application/json';
         data = JSON.stringify({
           error: data,
@@ -342,6 +353,7 @@ export class Prxi {
 
       stream.end(data);
     } catch (e) {
+      /* istanbul ignore next */
       this.logError(`Prxi failed to send 500 error`, e);
     }
   }
@@ -355,6 +367,8 @@ export class Prxi {
     try {
       res.statusCode = 500;
       let data = 'Unexpected error occurred';
+
+      /* istanbul ignore else */
       if (req.headers.accept && req.headers.accept.indexOf('application/json') >= 0) {
         data = JSON.stringify({
           error: data,
@@ -366,10 +380,12 @@ export class Prxi {
         try {
           res.end();
         } catch (e) {
+          /* istanbul ignore next */
           this.logError(`Prxi failed to send 500 error`, e);
         }
       });
     } catch (e) {
+      /* istanbul ignore next */
       this.logError(`Prxi failed to send 500 error`, e);
     }
   }

@@ -37,13 +37,22 @@ export class Http2ProxyHandler {
     });
 
     session.on('close', () => {
-      connection.close();
-      this.connections.delete(session);
+      this.closeConnection(session, connection);
     });
 
     return connection;
   }
 
+
+  /**
+   * Close connection
+   * @param session
+   * @param connection
+   */
+  private closeConnection(session: Http2Session, connection: ClientHttp2Session): void {
+    this.connections.delete(session);
+    connection.close();
+  }
 
   /**
    * Proxy request
@@ -128,14 +137,18 @@ export class Http2ProxyHandler {
         return handle();
       }
 
-      //client.setTimeout(2000);
+      if (this.configuration.proxyRequestTimeout) {
+        client.setTimeout(this.configuration.proxyRequestTimeout, () => {
+          this.closeConnection(session, client);
+          this.logInfo(`[${requestId}] [Http2ProxyHandler] Proxy request timeout`);
+        });
+      }
       client.once('connect', () => {
         handle();
       });
 
       client.once('error', (err) => {
-        client.close();
-        this.connections.delete(session);
+        this.closeConnection(session, client);
         this.logInfo(`[${requestId}] [Http2ProxyHandler] Proxy request failed, error: ${err.message}`);
         reject(err);
       });

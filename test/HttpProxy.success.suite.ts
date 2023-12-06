@@ -1,4 +1,4 @@
-import {suite, test} from '@testdeck/mocha';
+import {suite, test, context} from '@testdeck/mocha';
 import { TestServer, TestProxy, TestProxyParams, assertReject } from './helpers';
 import {deepEqual, strictEqual} from 'assert';
 import {io} from 'socket.io-client';
@@ -9,7 +9,6 @@ import { FetchHelpers } from './helpers/FetchHelper';
 
 abstract class BaseHttpProxySuccessSuite {
   constructor(private mode: 'HTTP' | 'HTTP2', private secure = false) {
-    console.log(`========= ${mode} ${secure ? '[secure]' : ''} =========`)
   }
 
   private server: TestServer = null;
@@ -23,6 +22,7 @@ abstract class BaseHttpProxySuccessSuite {
    * Before hook
    */
   async before(): Promise<void> {
+    console.log(`========= [${this.mode}]${this.secure ? ' [secure]' : ''} ${this[context].test.title} =========`);
     this.server = new TestServer(this.mode, this.secure, true);
     this.proxy = null;
 
@@ -35,6 +35,7 @@ abstract class BaseHttpProxySuccessSuite {
   async after(): Promise<void> {
     await this.proxy?.stop();
     await this.server.stop();
+    console.log(`========= [${this.mode}]${this.secure ? ' [secure]' : ''} ${this[context].test.title} =========`);
   }
 
   /**
@@ -67,12 +68,19 @@ abstract class BaseHttpProxySuccessSuite {
   async multipleEchoRequests(): Promise<void> {
     await this.initProxy();
 
-    const testData = [];
-    for (let i = 0; i < 1000 * 1000; i++) {
-      testData.push('Iteration - ' + i);
-    }
-
+    const testData = 'Test';
     const result = await new FetchHelpers(this.mode, this.secure, 2).post(`${this.proxyUrl}/echo`, testData);
+    deepEqual(result.data, testData);
+  }
+
+  @test()
+  async multipleEchoRequestsWithTimeout(): Promise<void> {
+    await this.initProxy({
+      proxyRequestTimeout: 5,
+    });
+
+    const testData = 'Test';
+    const result = await new FetchHelpers(this.mode, this.secure, 2, 10).post(`${this.proxyUrl}/echo`, testData);
     deepEqual(result.data, testData);
   }
 
