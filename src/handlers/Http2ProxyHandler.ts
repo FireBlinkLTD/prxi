@@ -33,24 +33,6 @@ export class Http2ProxyHandler {
     connection = connect(target);
     this.connections.set(session, connection);
 
-    // const interval = setInterval(() => {
-    //   if (connection.closed) {
-    //     session.close();
-    //     clearInterval(interval);
-    //     return;
-    //   }
-
-    //   this.logInfo(`[Http2ProxyHandler] Ping ${target}`);
-    //   connection.ping((err) => {
-    //     if (err) {
-    //       this.logError(`[Http2ProxyHandler] Ping failed ${target}`, err);
-    //       this.closeConnection(session, connection);
-    //     } else {
-    //       this.logInfo(`[Http2ProxyHandler] Ping success`);
-    //     }
-    //   });
-    // }, 5000);
-
     connection.on('close', () => {
       this.closeConnection(session, connection);
     });

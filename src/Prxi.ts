@@ -37,15 +37,22 @@ export class Prxi {
     /* istanbul ignore next */
     configuration.proxyRequestTimeout = configuration.proxyRequestTimeout ?? 60 * 1000;
 
+    /* istanbul ignore next */
+    configuration.mode = configuration.mode ?? 'HTTP';
+
     const {logInfo, logError} = this.configuration;
-    this.logInfo = (msg) => {
-      // istanbul ignore next
-      (logInfo || this.logInfo)(`[${new Date().toISOString()}] ${msg}`);
+    this.logInfo = (message?: any, ...params: any[]) => {
+      /* istanbul ignore next */
+      if (logInfo) {
+        logInfo(`[${new Date().toISOString()}]`, message, ...params);
+      }
     };
 
-    this.logError = (msg, err) => {
-      // istanbul ignore next
-      (logError || this.logError)(`[${new Date().toISOString()}] ${msg}`, err);
+    this.logError = (message?: any, ...params: any[]) => {
+      /* istanbul ignore next */
+      if (logError) {
+        logError(`[${new Date().toISOString()}]`, message, ...params);
+      }
     };
   }
 
@@ -57,8 +64,7 @@ export class Prxi {
       if (this.configuration.mode === 'HTTP') {
         if (this.configuration.secure) {
           return createSecureHttp1Server({
-            key: this.configuration.secure.key,
-            cert: this.configuration.secure.cert,
+            ...this.configuration.secure,
           }, cb);
         }
 
@@ -69,8 +75,7 @@ export class Prxi {
         if (this.configuration.secure) {
           return createSecureHttp2Server({
             allowHTTP1: true,
-            key: this.configuration.secure.key,
-            cert: this.configuration.secure.cert,
+            ...this.configuration.secure,
           }, cb);
         }
 
@@ -158,10 +163,11 @@ export class Prxi {
 
       const {handler, upstream, proxy, context} = this.findRequestHandler('HTTP', upstreamConfigurations, <HttpMethod> req.method, path);
       if (handler) {
+        let errHandler = errorHandler;
         /* istanbul ignore next */
         if (upstream.errorHandler) {
           /* istanbul ignore next */
-          errorHandler = upstream.errorHandler;
+          errHandler = upstream.errorHandler;
         }
 
         const headersToSet = RequestUtils.prepareProxyHeaders(
@@ -181,7 +187,7 @@ export class Prxi {
             await proxy.http.proxy(requestId, req, res, proxyConfiguration);
           }, <HttpMethod> req.method, path, context).catch((err: Error) => {
             this.logError(`[${requestId}] [Prxi] Error occurred upon making the "${req.method}:${path}" request`, err);
-            errorHandler(req, res, err)
+            errHandler(req, res, err)
             .catch(err => {
               this.logError(`[${requestId}] [Prxi] Unable to handle error with errorHandler`, err);
               this.send500Error(req, res);
@@ -215,10 +221,11 @@ export class Prxi {
           const {handler, upstream, proxy, context} = this.findRequestHandler('HTTP2', upstreamConfigurations, <HttpMethod> method, <string> path);
 
           if (handler) {
+            let http2ErrHandler = http2ErrorHandler;
             /* istanbul ignore next */
-            if (upstream.errorHandler) {
+            if (upstream.http2ErrorHandler) {
               /* istanbul ignore next */
-              errorHandler = upstream.errorHandler;
+              http2ErrHandler = upstream.http2ErrorHandler;
             }
 
             const headersToSet = RequestUtils.prepareProxyHeaders(
@@ -239,7 +246,7 @@ export class Prxi {
               context
             ).catch((err: Error) => {
               this.logError(`[${requestId}] [Prxi] Error occurred upon making the "${method}:${path}" request`, err);
-              http2ErrorHandler(stream, headers, err)
+              http2ErrHandler(stream, headers, err)
               .catch(err => {
                 this.logError(`[${requestId}] [Prxi] Unable to handle error with errorHandler`, err);
                 this.send500ErrorForHttp2(stream, headers);
@@ -253,7 +260,6 @@ export class Prxi {
               this.send500ErrorForHttp2(stream, headers);
             })
           }
-
         });
       });
     }
