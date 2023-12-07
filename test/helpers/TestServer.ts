@@ -8,6 +8,7 @@ import  { Server as SocketIOServer } from 'socket.io';
 import { Request, Response, Server } from '../../src/interfaces';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
+import { Socket } from 'net';
 
 export class TestServer {
   public static readonly PORT = 7777;
@@ -18,6 +19,7 @@ export class TestServer {
     cert: string,
   }
   public failHttp2Request = false;
+  private sockets = new Set<Socket>();
 
   constructor(private mode: 'HTTP' | 'HTTP2', private secure: boolean, private wsEnabled: boolean, private prefix: string = '') {
     if (this.secure) {
@@ -63,6 +65,7 @@ export class TestServer {
       console.log(`-> [${this.mode}] Starting Server`);
 
       this.server = this.createServer((req: Request, res: Response) => {
+        console.log('-> request', req.httpVersion, req.url);
         if (this.mode === 'HTTP2' && req.httpVersion === "2.0") {
           // Ignore HTTP/2 requests
           return;
@@ -95,6 +98,7 @@ export class TestServer {
 
       if (this.mode === 'HTTP2') {
         this.server.on('stream', (stream, headers) => {
+          console.log('-> new stream');
           const path = headers[constants.HTTP2_HEADER_PATH].toString();
           const method = headers[constants.HTTP2_HEADER_METHOD].toString();
 
@@ -166,6 +170,14 @@ export class TestServer {
         });
       }
 
+      this.server.on('connection', (socket) => {
+        this.sockets.add(socket);
+
+        socket.once('close', () => {
+          this.sockets.delete(socket);
+        });
+      });
+
       this.server.listen(TestServer.PORT, () => {
         console.log(`TestServer started on port ${TestServer.PORT}`);
         resolve();
@@ -234,16 +246,23 @@ export class TestServer {
    * Stop server
    */
   public async stop() {
+    console.log(`[${new Date().toISOString()}] TestServer stopping...`);
     await new Promise<void>((resolve, reject) => {
+      this.sockets.forEach(s => {
+        s.destroy();
+        this.sockets.delete(s);
+      });
+
+
       this.server.close((err) => {
         if (err) {
           console.log(`TestServer failed`, err);
           return reject(err);
         }
 
-        console.log(`TestServer stopped`);
         resolve();
       });
     });
+    console.log(`[${new Date().toISOString()}] TestServer stopped`);
   }
 }

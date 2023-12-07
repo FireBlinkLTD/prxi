@@ -33,6 +33,8 @@ abstract class BaseHttpProxyErrorSuite {
     async after(): Promise<void> {
       await this.proxy?.stop();
       await this.server.stop();
+      this.proxy = null;
+      this.server = null;
       console.log(`========= [${this.mode}]${this.secure ? ' [secure]' : ''} ${this[context].test.title} =========`);
     }
 

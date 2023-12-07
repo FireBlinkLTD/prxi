@@ -509,10 +509,10 @@ export class Prxi {
             return rej(err);
           }
 
-          this.logInfo('Prxi stopped');
           res();
         });
       });
+      this.logInfo('Prxi stopped');
     } else {
       this.logInfo('Prxi stopping skipped, not running');
     }
