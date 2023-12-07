@@ -1,7 +1,7 @@
-import {request as httpRequest, RequestOptions, IncomingMessage, ServerResponse} from 'http';
-import {request as httpsRequest} from 'https';
+import {request as httpRequest, RequestOptions, IncomingMessage} from 'node:http';
+import {request as httpsRequest} from 'node:https';
 
-import { Configuration, ProxyRequestConfiguration } from "../interfaces";
+import { Configuration, ProxyRequestConfiguration, Request, Response } from "../interfaces";
 import { UpstreamConfiguration } from "../interfaces/UpstreamConfiguration";
 import { RequestUtils } from "../utils";
 
@@ -23,8 +23,8 @@ export class HttpProxyHandler {
    */
   public async proxy(
     requestId: number,
-    req: IncomingMessage,
-    res: ServerResponse,
+    req: Request,
+    res: Response,
     proxyConfiguration?: ProxyRequestConfiguration,
   ): Promise<void> {
     // istanbul ignore next
@@ -63,7 +63,7 @@ export class HttpProxyHandler {
 
     /* istanbul ignore else */
     if (proxyConfiguration && proxyConfiguration.onBeforeProxyRequest) {
-      proxyConfiguration.onBeforeProxyRequest(options);
+      proxyConfiguration.onBeforeProxyRequest(options, options.headers);
     }
 
     const client = request(options);
@@ -72,10 +72,12 @@ export class HttpProxyHandler {
       req.pipe(client);
 
       client.on('error', (err) => {
+        this.logInfo(`[${requestId}] [HttpProxyHandler] Proxy request failed for method ${method} to ${host}${url}, error: ${err.message}`);
         reject(err);
       });
 
       client.on('response', (response: IncomingMessage) => {
+        this.logInfo(`[${requestId}] [HttpProxyHandler] Response received for method ${method} to ${host}${url}, status code ${response.statusCode}`);
         if (isKeepAliveRequest) {
           client.setTimeout(0);
         }

@@ -1,5 +1,5 @@
 bail: true
-timeout: 300000
+timeout: 30000
 require:
   - source-map-support/register
   - ts-node/register

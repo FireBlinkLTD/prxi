@@ -1,4 +1,4 @@
-import { ServerResponse } from "http";
+import { Response } from "../../src/interfaces/Response";
 
 /**
  * Write successful JSON response
@@ -6,7 +6,7 @@ import { ServerResponse } from "http";
  * @param jsonData
  * @param statusCode
  */
-export const writeJson = async (res: ServerResponse, jsonData: string, statusCode = 200): Promise<void> => {
+export const writeJson = async (res: Response, jsonData: string, statusCode = 200): Promise<void> => {
   res.statusCode = statusCode;
   res.setHeader('content-type', 'application/json');
   res.write(jsonData, () => {

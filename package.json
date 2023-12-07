@@ -13,8 +13,9 @@
   ],
   "scripts": {
     "build": "tsc",
+    "keygen": "openssl req -x509 -newkey rsa:2048 -nodes -sha256 -subj '/CN=localhost' -keyout test/key.pem -out test/cert.pem",
     "test:clean": "rimraf ./coverage",
-    "test": "nyc --reporter=html --reporter=text mocha",
+    "test": "export NODE_EXTRA_CA_CERTS=test/cert.pem && nyc --reporter=html --reporter=text mocha",
     "test:coverage": "nyc report --reporter=text-lcov > ./coverage/coverage.lcov"
   },
   "repository": {
@@ -25,7 +26,6 @@
     "@testdeck/mocha": "^0.3.3",
     "@types/mocha": "^10.0.1",
     "@types/node": "^20.3.1",
-    "axios": "^1.4.0",
     "mocha": "^10.2.0",
     "mochawesome": "^7.1.3",
     "nyc": "^15.1.0",

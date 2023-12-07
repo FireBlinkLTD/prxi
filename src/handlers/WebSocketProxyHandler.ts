@@ -80,7 +80,7 @@ export class WebSocketProxyHandler {
 
       /* istanbul ignore else */
       if (proxyConfiguration && proxyConfiguration.onBeforeProxyRequest) {
-        proxyConfiguration.onBeforeProxyRequest(options);
+        proxyConfiguration.onBeforeProxyRequest(options, options.headers);
       }
 
       const client = request(options);
@@ -117,11 +117,12 @@ export class WebSocketProxyHandler {
               this.upstream.proxyRequestHeaders,
               proxyConfiguration.proxyResponseHeaders,
             );
-            socket.write(WebSocketUtils.prepareRawHeadersString(`HTTP/${res.httpVersion} ${res.statusCode} ${res.statusMessage}`, headersToSet));
-            res.pipe(socket);
-          }
 
-          resolve();
+            socket.write(WebSocketUtils.prepareRawHeadersString(`HTTP/${res.httpVersion} ${res.statusCode} ${res.statusMessage}`, headersToSet), () => {
+              socket.end();
+              resolve();
+            });
+          }
         });
 
         client.on('upgrade', (proxyResponse: IncomingMessage, proxySocket: Socket, proxyHead: Buffer) => {

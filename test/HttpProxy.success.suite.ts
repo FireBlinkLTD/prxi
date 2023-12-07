@@ -1,27 +1,29 @@
-import {suite, test} from '@testdeck/mocha';
+import {suite, test, context} from '@testdeck/mocha';
 import { TestServer, TestProxy, TestProxyParams, assertReject } from './helpers';
-import axios from 'axios';
 import {deepEqual, strictEqual} from 'assert';
 import {io} from 'socket.io-client';
 import { Configuration, ProxyRequest, WebSocketProxyCancelRequest } from '../src';
 import { IncomingMessage } from 'http';
-import { Socket } from 'socket.io';
 import { Socket as NetSocket } from 'net';
+import { FetchHelpers } from './helpers/FetchHelper';
 
-@suite()
-export class HttpProxySuccessSuite {
+abstract class BaseHttpProxySuccessSuite {
+  constructor(private mode: 'HTTP' | 'HTTP2', private secure = false) {
+  }
+
   private server: TestServer = null;
   private proxy: TestProxy = null;
 
   private get proxyUrl() {
-    return `http://localhost:${TestProxy.PORT}`;
+    return new FetchHelpers(this.mode, this.secure).fixUrl(`http://localhost:${TestProxy.PORT}`);
   }
 
   /**
    * Before hook
    */
   async before(): Promise<void> {
-    this.server = new TestServer(true);
+    console.log(`========= [${this.mode}]${this.secure ? ' [secure]' : ''} ${this[context].test.title} =========`);
+    this.server = new TestServer(this.mode, this.secure, true);
     this.proxy = null;
 
     await this.server.start();
@@ -33,6 +35,9 @@ export class HttpProxySuccessSuite {
   async after(): Promise<void> {
     await this.proxy?.stop();
     await this.server.stop();
+    this.proxy = null;
+    this.server = null;
+    console.log(`========= [${this.mode}]${this.secure ? ' [secure]' : ''} ${this[context].test.title} =========`);
   }
 
   /**
@@ -41,6 +46,8 @@ export class HttpProxySuccessSuite {
   private async initProxy(configOverride: Partial<Configuration> = {}): Promise<void> {
     const params = new TestProxyParams();
     params.configOverride = configOverride;
+    params.mode = this.mode;
+    params.secure = this.secure;
 
     this.proxy = new TestProxy(params);
     await this.proxy.start();
@@ -55,14 +62,37 @@ export class HttpProxySuccessSuite {
       testData.push('Iteration - ' + i);
     }
 
-    const result = await axios.post(`${this.proxyUrl}/echo`, testData, {
-      maxBodyLength: 50 * 1024 * 1024, // 50 mb
+    const result = await new FetchHelpers(this.mode, this.secure).post(`${this.proxyUrl}/echo`, testData);
+    deepEqual(result.data, testData);
+  }
+
+  @test()
+  async multipleEchoRequests(): Promise<void> {
+    await this.initProxy();
+
+    const testData = 'Test';
+    const result = await new FetchHelpers(this.mode, this.secure, 2).post(`${this.proxyUrl}/echo`, testData);
+    deepEqual(result.data, testData);
+  }
+
+  @test()
+  async multipleEchoRequestsWithTimeout(): Promise<void> {
+    await this.initProxy({
+      proxyRequestTimeout: 5,
     });
+
+    const testData = 'Test';
+    const result = await new FetchHelpers(this.mode, this.secure, 2, 10).post(`${this.proxyUrl}/echo`, testData);
     deepEqual(result.data, testData);
   }
 
   @test()
   async echoRequestWithKeepAliveConnection(): Promise<void> {
+    if (this.mode === 'HTTP2') {
+      // invalid test for the HTTP/2 connection, as `Connection` header is not allowed
+      return;
+    }
+
     await this.initProxy();
 
     const testData = [];
@@ -70,11 +100,8 @@ export class HttpProxySuccessSuite {
       testData.push('Iteration - ' + i);
     }
 
-    const result = await axios.post(`${this.proxyUrl}/echo`, testData, {
-      maxBodyLength: 50 * 1024 * 1024, // 50 mb
-      headers: {
-        'Connection': 'keep-alive'
-      }
+    const result = await new FetchHelpers(this.mode, this.secure).post(`${this.proxyUrl}/echo`, testData, {
+      'Connection': 'keep-alive',
     });
     deepEqual(result.data, testData);
   }
@@ -82,9 +109,11 @@ export class HttpProxySuccessSuite {
   @test()
   async customPath(): Promise<void> {
     await this.after();
-    this.server = new TestServer(true, '/api');
+    this.server = new TestServer(this.mode, this.secure, true, '/api');
     const params = new TestProxyParams();
     params.prefix = '/api';
+    params.mode = this.mode;
+    params.secure = this.secure;
     this.proxy = new TestProxy(params);
     await this.proxy.start();
 
@@ -95,9 +124,7 @@ export class HttpProxySuccessSuite {
       testData.push('Iteration - ' + i);
     }
 
-    const result = await axios.post(`${this.proxyUrl}/echo`, testData, {
-      maxBodyLength: 50 * 1024 * 1024, // 50 mb
-    });
+    const result = await new FetchHelpers(this.mode, this.secure).post(`${this.proxyUrl}/echo`, testData);
     deepEqual(result.data, testData);
   }
 
@@ -105,7 +132,7 @@ export class HttpProxySuccessSuite {
   async queryRequest(): Promise<void> {
     await this.initProxy();
 
-    const result = await axios.get(`${this.proxyUrl}/query?test=1`);
+    const result = await new FetchHelpers(this.mode, this.secure).get(`${this.proxyUrl}/query?test=1`);
     deepEqual(result.data, {
       query: {
         test: '1',
@@ -117,21 +144,20 @@ export class HttpProxySuccessSuite {
   async headersRequest(): Promise<void> {
     await this.initProxy();
 
-    const result = await axios.get(`${this.proxyUrl}/headers`, {
-      headers: {
-        ReqConfigLevelCLEAR: 'empty',
-        REQConfigLevelOverwrite: 'overwrite',
-        Test: 'true',
-      }
+    const result = await new FetchHelpers(this.mode, this.secure).get(`${this.proxyUrl}/headers`, {
+      ReqConfigLevelCLEAR: 'empty',
+      REQConfigLevelOverwrite: 'overwrite',
+      Test: 'true',
     });
+    const data = await result.data;
 
     const requestHeaders = {
-      reqconfigleveloverwrite: result.data.headers['reqconfigleveloverwrite'],
-      reqproxylevel: result.data.headers['reqproxylevel'],
-      reqproxylevelclear: result.data.headers['reqproxylevelclear'],
-      reqconfiglevel: result.data.headers['reqconfiglevel'],
-      test: result.data.headers['test'],
-      ON_BEFORE_PROXY_HEADER: result.data.headers['ON_BEFORE_PROXY_HEADER'.toLowerCase()],
+      reqconfigleveloverwrite: data.headers['reqconfigleveloverwrite'],
+      reqproxylevel: data.headers['reqproxylevel'],
+      reqproxylevelclear: data.headers['reqproxylevelclear'],
+      reqconfiglevel: data.headers['reqconfiglevel'],
+      test: data.headers['test'],
+      ON_BEFORE_PROXY_HEADER: data.headers['ON_BEFORE_PROXY_HEADER'.toLowerCase()],
     }
 
     deepEqual(requestHeaders, {
@@ -164,8 +190,13 @@ export class HttpProxySuccessSuite {
 
   @test()
   async websocketHandle(): Promise<void> {
+    if (this.mode === 'HTTP2' && !this.secure) {
+      // invalid test for the HTTP/2 connection, as connection should be secured
+      return;
+    }
+
     await this.initProxy();
-    const sio = io(`http://localhost:${TestProxy.PORT}`, {
+    const sio = io(this.proxyUrl, {
       transports: ['websocket'],
       reconnection: false,
     });
@@ -177,6 +208,10 @@ export class HttpProxySuccessSuite {
         sio.disconnect();
         rej(new Error('Unable to connect to WS'));
       }, 2000);
+
+      sio.on('connect_error', (err) => {
+        console.error('connection error', err);
+      });
 
       sio.on('connect', () => {
         sio.on('echo', (msg: string) => {
@@ -194,15 +229,22 @@ export class HttpProxySuccessSuite {
 
   @test()
   async websocketCancel(): Promise<void> {
+    if (this.mode === 'HTTP2' && !this.secure) {
+      // invalid test for the HTTP/2 connection, as connection should be secured
+      return;
+    }
+
     await this.after();
 
-    this.server = new TestServer(true);
+    this.server = new TestServer(this.mode, this.secure, true);
     await this.server.start();
 
     const status = 418;
     const description = 'I\'m a teapot';
 
     const params = new TestProxyParams();
+    params.mode = this.mode;
+    params.secure = this.secure;
     params.customWsHandler = async (
         req: IncomingMessage,
         socket: NetSocket,
@@ -217,7 +259,7 @@ export class HttpProxySuccessSuite {
     this.proxy = new TestProxy(params);
     await this.proxy.start();
 
-    const sio = io(`http://localhost:${TestProxy.PORT}`, {
+    const sio = io(this.proxyUrl, {
       transports: ['websocket'],
       reconnection: false,
     });
@@ -234,5 +276,33 @@ export class HttpProxySuccessSuite {
     }));
 
     strictEqual(err.description.message, `Unexpected server response: ${status}`);
+  }
+}
+
+@suite()
+export class Http1ProxySuccessSuite extends BaseHttpProxySuccessSuite {
+  constructor() {
+    super('HTTP')
+  }
+}
+
+@suite()
+export class Http1ProxySuccessSuiteSecure extends BaseHttpProxySuccessSuite {
+  constructor() {
+    super('HTTP', true)
+  }
+}
+
+@suite()
+export class Http2ProxySuccessSuite extends BaseHttpProxySuccessSuite {
+  constructor() {
+    super('HTTP2')
+  }
+}
+
+@suite()
+export class Http2ProxySuccessSuiteSecure extends BaseHttpProxySuccessSuite {
+  constructor() {
+    super('HTTP2', true)
   }
 }
