@@ -320,7 +320,7 @@ export class Prxi {
       this.configuration.on?.upgrade?.(req, socket, head, context);
 
       const path = RequestUtils.getPath(req);
-      const {handler, proxy} = this.findWebSocketHandler(upstreamConfigurations, path, req.headers);
+      const {handler, proxy} = this.findWebSocketHandler(context, upstreamConfigurations, path, req.headers);
 
       this.logInfo(`[${requestId}] [Prxi] Upgrade event received on path: ${path}`);
       // handle websocket
@@ -515,12 +515,13 @@ export class Prxi {
 
   /**
    * Find WS handler across all the configs
+   * @param context
    * @param configs
    * @param path
    * @param headers
    * @returns
    */
-  private findWebSocketHandler(configs: UpstreamConfiguration[], path: string, headers: IncomingHttpHeaders): {
+  private findWebSocketHandler(context: Record<string, any>, configs: UpstreamConfiguration[], path: string, headers: IncomingHttpHeaders): {
     proxy: Proxy | null,
     handler: WebSocketHandlerConfig | null,
     upstream: UpstreamConfiguration | null,
