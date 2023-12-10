@@ -316,10 +316,11 @@ export class Prxi {
     // handle upgrade action
     server.on('upgrade', (req: IncomingMessage, socket: Socket, head: Buffer) => {
       const requestId = id++;
-      this.configuration.on?.upgrade?.(req, socket, head);
+      const context = {};
+      this.configuration.on?.upgrade?.(req, socket, head, context);
 
       const path = RequestUtils.getPath(req);
-      const {handler, proxy, context} = this.findWebSocketHandler(upstreamConfigurations, path, req.headers);
+      const {handler, proxy} = this.findWebSocketHandler(upstreamConfigurations, path, req.headers);
 
       this.logInfo(`[${requestId}] [Prxi] Upgrade event received on path: ${path}`);
       // handle websocket
@@ -350,11 +351,17 @@ export class Prxi {
           },
           path,
           context
-        ).catch(err => {
+        )
+        .finally(() => {
+          this.configuration.on?.afterUpgrade?.(req, socket, head, context);
+        })
+        .catch(err => {
           this.logError(`[${requestId}] [Prxi] Unable to handle websocket request`, err);
           Prxi.closeSocket(req, socket, 500, 'Unexpected error ocurred', headersToSet);
         });
       } else {
+        /* istanbul ignore next */
+        this.configuration.on?.afterUpgrade?.(req, socket, head, context);
         this.logInfo(`[${requestId}] [Prxi] Unable to handle upgrade request`);
 
         const headersToSet = RequestUtils.prepareProxyHeaders(
@@ -517,9 +524,7 @@ export class Prxi {
     proxy: Proxy | null,
     handler: WebSocketHandlerConfig | null,
     upstream: UpstreamConfiguration | null,
-    context: Record<string, any>,
   } | null {
-    const context = {};
     for (const upstream of configs) {
       const handler = upstream.webSocketHandlers?.find(i => i.isMatching(path, context, headers));
       if (handler) {
@@ -528,7 +533,6 @@ export class Prxi {
           proxy,
           handler,
           upstream,
-          context,
         };
       }
     }
@@ -537,7 +541,6 @@ export class Prxi {
       proxy: null,
       handler: null,
       upstream: null,
-      context,
     };
   }
 

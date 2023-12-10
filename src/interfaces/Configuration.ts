@@ -66,7 +66,8 @@ export interface Configuration {
   on?: {
     beforeHTTPRequest?: (req: Request, res: Response, context: Record<string, any>) => void;
     afterHTTPRequest?: (req: Request, res: Response, context: Record<string, any>) => void;
-    upgrade?: (req: Request, socket: Socket, head: Buffer) => void;
+    upgrade?: (req: Request, socket: Socket, head: Buffer, context: Record<string, any>) => void;
+    afterUpgrade?: (req: Request, socket: Socket, head: Buffer, context: Record<string, any>) => void;
     beforeHTTP2Request?: (stream: Stream, headers: IncomingHttpHeaders, context: Record<string, any>) => void;
     afterHTTP2Request?: (stream: Stream, headers: IncomingHttpHeaders, context: Record<string, any>) => void;
   }

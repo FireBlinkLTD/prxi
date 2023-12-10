@@ -222,11 +222,22 @@ abstract class BaseHttpProxySuccessSuite {
       return;
     }
 
-    let onUpgrade = false;
+    let c: Record<string, any>;
+    let res: Function;
+    let p = new Promise<void>(r => res = r);
     await this.initProxy({
       on: {
-        upgrade: (req, socket, head) => {
-          onUpgrade = true;
+        upgrade: (req, socket, head, context) => {
+          console.log('-> upgrade');
+          c = context;
+          context.upgrade = true;
+        },
+
+        afterUpgrade: (req, socket, head, context) => {
+          console.log('-> afterUpgrade');
+          c = context;
+          context.afterUpgrade = true;
+          res();
         }
       }
     });
@@ -258,8 +269,11 @@ abstract class BaseHttpProxySuccessSuite {
       });
     });
 
+    await p;
     strictEqual(received, send);
-    ok(onUpgrade);
+    ok(c);
+    strictEqual(c.upgrade, true);
+    strictEqual(c.afterUpgrade, true);
   }
 
   @test()

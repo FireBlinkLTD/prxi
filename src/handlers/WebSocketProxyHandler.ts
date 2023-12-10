@@ -49,7 +49,6 @@ export class WebSocketProxyHandler {
         proxyConfiguration = emptyObj;
       }
 
-
       // istanbul ignore next
       let target = proxyConfiguration.target || this.upstream.target;
       // istanbul ignore next

@@ -74,12 +74,12 @@ export class HttpProxyHandler {
       req.pipe(client);
 
       client.on('error', (err) => {
-        this.logInfo(`[${requestId}] [HttpProxyHandler] Proxy request failed for method ${method} to ${host}${url}, error: ${err.message}`);
+        this.logInfo(`[${requestId}] [HttpProxyHandler] Proxy request failed for method ${method} to ${host}:${port}${url}, error: ${err.message}`);
         reject(err);
       });
 
       client.on('response', (response: IncomingMessage) => {
-        this.logInfo(`[${requestId}] [HttpProxyHandler] Response received for method ${method} to ${host}${url}, status code ${response.statusCode}`);
+        this.logInfo(`[${requestId}] [HttpProxyHandler] Response received for method ${method} to ${host}:${port}${url}, status code ${response.statusCode}`);
         if (isKeepAliveRequest) {
           client.setTimeout(0);
         }
@@ -105,7 +105,7 @@ export class HttpProxyHandler {
         // istanbul ignore else
         if (!res.writableEnded) {
           response.on('end', () => {
-            this.logInfo(`[${requestId}] [HttpProxyHandler] Proxy request with method ${method} to ${host}${url} completed`);
+            this.logInfo(`[${requestId}] [HttpProxyHandler] Proxy request with method ${method} to ${host}:${port}${url} completed`);
             resolve();
           });
 
