@@ -1,6 +1,6 @@
 import {test, context, suite} from '@testdeck/mocha';
 import { TestServer, TestProxy, TestProxyParams } from './helpers';
-import {deepEqual} from 'assert';
+import {deepEqual, strictEqual} from 'assert';
 import { Configuration } from '../src';
 import { FetchHelpers } from './helpers/FetchHelper';
 
@@ -56,14 +56,29 @@ abstract class Http2ProxySuite {
 
     const testData = 'Test';
 
-    let error;
-    try {
-      await new FetchHelpers(this.mode, this.secure)
-        .post(`${this.proxyUrl}/echo`, testData);
-    } catch (err) {
-      error = err;
-    }
+    const resp = await new FetchHelpers(this.mode, this.secure)
+      .post(`${this.proxyUrl}/echo`, testData);
 
-    console.log('@@@', error);
+    strictEqual(resp.data.error, 'Unexpected error occurred');
+  }
+
+  @test()
+  async stopPrxi(): Promise<void> {
+    await this.initProxy();
+    this.server.initialResponseDelay = 30;
+
+    const testData = 'Test';
+
+    const promise = new FetchHelpers(this.mode, this.secure)
+        .post(`${this.proxyUrl}/echo`, testData);
+
+    await new Promise<void>((res, rej) => {
+      setTimeout(() => {
+        this.proxy.stop(true).then(res, rej);
+      }, 10);
+    });
+
+    const resp = await promise;
+    //strictEqual(resp, 'Unexpected error occurred');
   }
 }

@@ -189,6 +189,11 @@ export class FetchHelpers {
             }
           });
 
+          req.once('error', (err) => {
+            console.error('FetchHelper - req error', err);
+            rej(err);
+          });
+
           req.setEncoding('utf8');
           let data = '';
           req.on('data', (chunk) => {

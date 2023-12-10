@@ -128,14 +128,29 @@ export class Http2ProxyHandler {
             proxyConfiguration.onBeforeResponse(null, headersToSet, context);
           }
 
-          stream.respond(headersToSet);
+          try {
+            /* istanbul ignore else */
+            if (!stream.closed) {
+              stream.respond(headersToSet);
+              proxyReq.pipe(stream);
+            }
+          } catch (e) {
+            /* istanbul ignore next */
+            this.logError(`[${requestId}] [Http2ProxyHandler] Unable to send response`, e);
+            /* istanbul ignore next */
+            resolve();
+          }
+        });
+
+        proxyReq.on('error', (err) => {
+          this.logError(`[${requestId}] [Http2ProxyHandler] HTTP/2 stream error`, err);
         });
 
         proxyReq.once('end', () => {
           resolve();
-        })
+        });
 
-        proxyReq.pipe(stream).pipe(proxyReq);
+        stream.pipe(proxyReq);
       }
 
       if (!client.connecting && !client.closed) {

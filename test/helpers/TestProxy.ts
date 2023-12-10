@@ -160,7 +160,7 @@ export class TestProxy {
   /**
    * Stop proxy server
    */
-  public async stop() {
-    await this.proxy?.stop();
+  public async stop(force = false) {
+    await this.proxy?.stop(force);
   }
 }

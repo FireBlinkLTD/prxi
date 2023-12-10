@@ -19,6 +19,7 @@ export class TestServer {
     cert: string,
   }
   public failHttp2Request = false;
+  public initialResponseDelay = 0;
   private sockets = new Set<Socket>();
 
   constructor(private mode: 'HTTP' | 'HTTP2', private secure: boolean, private wsEnabled: boolean, private prefix: string = '') {
@@ -98,6 +99,9 @@ export class TestServer {
 
       if (this.mode === 'HTTP2') {
         this.server.on('stream', (stream, headers) => {
+          stream.on('error', (err) => {
+            console.error('-> Stream error', err);
+          });
           console.log('-> new stream');
           const path = headers[constants.HTTP2_HEADER_PATH].toString();
           const method = headers[constants.HTTP2_HEADER_METHOD].toString();
@@ -192,13 +196,21 @@ export class TestServer {
    * @param body
    */
   private http2respond(stream: ServerHttp2Stream, status: number, body: any, headers = {}): void {
-    stream.respond({
-      'content-type': 'application/json',
-      [constants.HTTP2_HEADER_STATUS]: status,
-      ...headers,
-    })
-    stream.write(JSON.stringify(body));
-    stream.end();
+    setTimeout(() => {
+      try {
+        if (!stream.closed) {
+          stream.respond({
+            'content-type': 'application/json',
+            [constants.HTTP2_HEADER_STATUS]: status,
+            ...headers,
+          })
+          stream.write(JSON.stringify(body));
+          stream.end();
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }, this.initialResponseDelay);
   }
 
   /**
@@ -252,7 +264,6 @@ export class TestServer {
         s.destroy();
         this.sockets.delete(s);
       });
-
 
       this.server.close((err) => {
         if (err) {

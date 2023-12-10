@@ -31,6 +31,7 @@ export class Prxi {
   private logInfo: (message?: any, ...params: any[]) => void;
   private logError: (message?: any, ...params: any[]) => void;
   private proxies: Proxy[];
+  private sockets = new Set<Socket>();
 
   constructor(private configuration: Configuration) {
     // set default values
@@ -226,6 +227,11 @@ export class Prxi {
         }
 
         session.on('stream', (stream, headers) => {
+          /* istanbul ignore next */
+          stream.on('error', (err) => {
+            this.logError(`[${requestId}] [Prxi] HTTP/2 stream error`, err);
+          });
+
           const requestId = id++;
           const context = {};
           this.configuration.on?.beforeHTTP2Request?.(stream, headers, context);
@@ -299,6 +305,12 @@ export class Prxi {
     // keep track of all open connections
     server.on('connection', (connection: Socket) => {
       connection.setTimeout(this.configuration.proxyRequestTimeout);
+
+      this.sockets.add(connection);
+
+      connection.once('close', () => {
+        this.sockets.delete(connection);
+      });
     });
 
     // handle upgrade action
@@ -370,6 +382,11 @@ export class Prxi {
    * @param res
    */
   private send500ErrorForHttp2(stream: ServerHttp2Stream, headers: IncomingHttpHeaders): void {
+    /* istanbul ignore next */
+    if (stream.closed) {
+      return;
+    }
+
     try {
       let contentType = 'text/plain';
       let data = 'Unexpected error occurred';
@@ -526,8 +543,9 @@ export class Prxi {
 
   /**
    * Stop proxy service if running
+   * @param force
    */
-  public async stop(): Promise<void> {
+  public async stop(force?: boolean): Promise<void> {
     const server = this.server;
 
     /* istanbul ignore next */
@@ -535,6 +553,12 @@ export class Prxi {
       this.server = null;
       await new Promise<void>((res, rej) => {
         this.logInfo('Stopping Prxi');
+        if (force) {
+          this.sockets.forEach(s => {
+            s.destroy();
+            this.sockets.delete(s);
+          });
+        }
 
         server.close((err) => {
           if (err) {
