@@ -5,6 +5,9 @@
   "main": "dist/src/index.js",
   "author": "Vladyslav Tkachenko <vlad@fireblink.com>",
   "license": "MIT",
+  "engines": {
+    "node": ">= 20.0.0"
+  },
   "keywords": [
     "proxy",
     "reverse proxy",
