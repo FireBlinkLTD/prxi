@@ -157,13 +157,13 @@ export class Prxi {
       }
 
       const requestId = id++;
+      const context = {};
       const path = RequestUtils.getPath(req);
+      this.configuration.on?.beforeHTTPRequest?.(req, res, context);
 
       this.logInfo(`[${requestId}] [Prxi] Handling incoming request for method: ${req.method} and path: ${path}`);
-
-      const {handler, upstream, proxy, context} = this.findRequestHandler('HTTP', upstreamConfigurations, <HttpMethod> req.method, path, req.headers);
+      const {handler, upstream, proxy} = this.findRequestHandler('HTTP', upstreamConfigurations, <HttpMethod> req.method, path, req.headers, context);
       if (handler) {
-        this.configuration.on?.beforeHTTPRequest?.(req, res, context);
         let errHandler = errorHandler;
         /* istanbul ignore next */
         if (upstream.errorHandler) {
@@ -204,6 +204,8 @@ export class Prxi {
           }
         );
       } else {
+        /* istanbul ignore next */
+        this.configuration.on?.afterHTTPRequest?.(req, res, context);
         this.logError(`[${requestId}] [Prxi] Missing RequestHandler configuration for the "${req.method}:${path}" request`);
         errorHandler(req, res, new Error(`Missing RequestHandler configuration for the "${req.method}:${path}" request`))
         .catch(err => {
@@ -225,13 +227,21 @@ export class Prxi {
 
         session.on('stream', (stream, headers) => {
           const requestId = id++;
+          const context = {};
+          this.configuration.on?.beforeHTTP2Request?.(stream, headers, context);
 
           const path = RequestUtils.getPathFromStr(headers[constants.HTTP2_HEADER_PATH].toString());
           const method = headers[constants.HTTP2_HEADER_METHOD].toString();
-          const {handler, upstream, proxy, context} = this.findRequestHandler('HTTP2', upstreamConfigurations, <HttpMethod> method, <string> path, headers);
+          const {handler, upstream, proxy} = this.findRequestHandler(
+            'HTTP2',
+            upstreamConfigurations,
+            <HttpMethod> method,
+            <string> path,
+            headers,
+            context,
+          );
 
           if (handler) {
-            this.configuration.on?.beforeHTTP2Request?.(stream, headers, context);
             let http2ErrHandler = http2ErrorHandler;
             /* istanbul ignore next */
             if (upstream.http2ErrorHandler) {
@@ -268,6 +278,8 @@ export class Prxi {
               })
             });
           } else {
+            /* istanbul ignore next */
+            this.configuration.on?.afterHTTP2Request?.(stream, headers, context);
             this.logError(`[${requestId}] [Prxi] Missing RequestHandler configuration for the "${method}:${path}" HTTP/2 request`);
             http2ErrorHandler(stream, headers, new Error(`Missing RequestHandler configuration for the "${method}:${path}" HTTP/2 request`))
             .catch(err => {
@@ -437,13 +449,18 @@ export class Prxi {
    * @param headers
    * @returns
    */
-  private findRequestHandler(mode: 'HTTP' | 'HTTP2', configs: UpstreamConfiguration[], method: HttpMethod, path: string, headers: IncomingHttpHeaders): {
+  private findRequestHandler(
+    mode: 'HTTP' | 'HTTP2',
+    configs: UpstreamConfiguration[],
+    method: HttpMethod,
+    path: string,
+    headers: IncomingHttpHeaders,
+    context: Record<string, any>,
+  ): {
     proxy: Proxy | null,
     handler: HttpRequestHandlerConfig | Http2RequestHandlerConfig | null,
     upstream: UpstreamConfiguration | null,
-    context: Record<string, any>
   } | null {
-    const context = {};
     for (const upstream of configs) {
       let handler;
 
@@ -461,7 +478,6 @@ export class Prxi {
           proxy,
           handler,
           upstream,
-          context
         };
       }
     }
@@ -470,7 +486,6 @@ export class Prxi {
       proxy: null,
       handler: null,
       upstream: null,
-      context,
     };
   }
 
