@@ -161,8 +161,9 @@ export class Prxi {
 
       this.logInfo(`[${requestId}] [Prxi] Handling incoming request for method: ${req.method} and path: ${path}`);
 
-      const {handler, upstream, proxy, context} = this.findRequestHandler('HTTP', upstreamConfigurations, <HttpMethod> req.method, path);
+      const {handler, upstream, proxy, context} = this.findRequestHandler('HTTP', upstreamConfigurations, <HttpMethod> req.method, path, req.headers);
       if (handler) {
+        this.configuration.on?.beforeHTTPRequest?.(req, res, context);
         let errHandler = errorHandler;
         /* istanbul ignore next */
         if (upstream.errorHandler) {
@@ -178,21 +179,30 @@ export class Prxi {
         RequestUtils.updateResponseHeaders(res, headersToSet);
 
         (<HttpRequestHandlerConfig> handler).handle(
-          req,
-          res,
-          async (
-            proxyConfiguration?: ProxyRequestConfiguration,
-          ): Promise<void> => {
-            this.logInfo(`[${requestId}] [Prxi] Handling HTTP/1.1 proxy request for ${req.method} ${path}`);
-            await proxy.http.proxy(requestId, req, res, proxyConfiguration);
-          }, <HttpMethod> req.method, path, context).catch((err: Error) => {
+            req,
+            res,
+            async (
+              proxyConfiguration?: ProxyRequestConfiguration,
+            ): Promise<void> => {
+              this.logInfo(`[${requestId}] [Prxi] Handling HTTP/1.1 proxy request for ${req.method} ${path}`);
+              await proxy.http.proxy(requestId, req, res, context, proxyConfiguration);
+            },
+            <HttpMethod> req.method,
+            path,
+            context
+          )
+          .finally(() => {
+            this.configuration.on?.afterHTTPRequest?.(req, res, context);
+          })
+          .catch((err: Error) => {
             this.logError(`[${requestId}] [Prxi] Error occurred upon making the "${req.method}:${path}" request`, err);
             errHandler(req, res, err)
             .catch(err => {
               this.logError(`[${requestId}] [Prxi] Unable to handle error with errorHandler`, err);
               this.send500Error(req, res);
             })
-          });
+          }
+        );
       } else {
         this.logError(`[${requestId}] [Prxi] Missing RequestHandler configuration for the "${req.method}:${path}" request`);
         errorHandler(req, res, new Error(`Missing RequestHandler configuration for the "${req.method}:${path}" request`))
@@ -218,9 +228,10 @@ export class Prxi {
 
           const path = RequestUtils.getPathFromStr(headers[constants.HTTP2_HEADER_PATH].toString());
           const method = headers[constants.HTTP2_HEADER_METHOD].toString();
-          const {handler, upstream, proxy, context} = this.findRequestHandler('HTTP2', upstreamConfigurations, <HttpMethod> method, <string> path);
+          const {handler, upstream, proxy, context} = this.findRequestHandler('HTTP2', upstreamConfigurations, <HttpMethod> method, <string> path, headers);
 
           if (handler) {
+            this.configuration.on?.beforeHTTP2Request?.(stream, headers, context);
             let http2ErrHandler = http2ErrorHandler;
             /* istanbul ignore next */
             if (upstream.http2ErrorHandler) {
@@ -239,12 +250,16 @@ export class Prxi {
               headers,
               async (proxyConfiguration?: ProxyRequestConfiguration): Promise<void> => {
                 this.logInfo(`[${requestId}] [Prxi] Handling HTTP/2 proxy request for path: ${path}`);
-                await proxy.http2.proxy(requestId, session, stream, headersToSet, proxyConfiguration);
+                await proxy.http2.proxy(requestId, session, stream, headersToSet, context, proxyConfiguration);
               },
               <HttpMethod> method,
               path,
               context
-            ).catch((err: Error) => {
+            )
+            .finally(() => {
+              this.configuration.on?.afterHTTP2Request?.(stream, headers, context);
+            })
+            .catch((err: Error) => {
               this.logError(`[${requestId}] [Prxi] Error occurred upon making the "${method}:${path}" request`, err);
               http2ErrHandler(stream, headers, err)
               .catch(err => {
@@ -277,9 +292,10 @@ export class Prxi {
     // handle upgrade action
     server.on('upgrade', (req: IncomingMessage, socket: Socket, head: Buffer) => {
       const requestId = id++;
+      this.configuration.on?.upgrade?.(req, socket, head);
 
       const path = RequestUtils.getPath(req);
-      const {handler, proxy, context} = this.findWebSocketHandler(upstreamConfigurations, path);
+      const {handler, proxy, context} = this.findWebSocketHandler(upstreamConfigurations, path, req.headers);
 
       this.logInfo(`[${requestId}] [Prxi] Upgrade event received on path: ${path}`);
       // handle websocket
@@ -301,7 +317,7 @@ export class Prxi {
           // handle
           async (proxyConfiguration?: ProxyRequestConfiguration): Promise<void> => {
             this.logInfo(`[${requestId}] [Prxi] Handling WS proxy request for path: ${path}`);
-            await proxy.ws.proxy(requestId, req, socket, head, proxyConfiguration);
+            await proxy.ws.proxy(requestId, req, socket, head, context, proxyConfiguration);
           },
           // cancel
           (status: number, description: string) => {
@@ -418,9 +434,10 @@ export class Prxi {
    * @param configs
    * @param method
    * @param path
+   * @param headers
    * @returns
    */
-  private findRequestHandler(mode: 'HTTP' | 'HTTP2', configs: UpstreamConfiguration[], method: HttpMethod, path: string): {
+  private findRequestHandler(mode: 'HTTP' | 'HTTP2', configs: UpstreamConfiguration[], method: HttpMethod, path: string, headers: IncomingHttpHeaders): {
     proxy: Proxy | null,
     handler: HttpRequestHandlerConfig | Http2RequestHandlerConfig | null,
     upstream: UpstreamConfiguration | null,
@@ -431,11 +448,11 @@ export class Prxi {
       let handler;
 
       if (mode === 'HTTP') {
-        handler = upstream.requestHandlers?.find(i => i.isMatching(method, path, context));
+        handler = upstream.requestHandlers?.find(i => i.isMatching(method, path, context, headers));
       }
 
       if (mode === 'HTTP2') {
-        handler = upstream.http2RequestHandlers?.find(i => i.isMatching(method, path, context));
+        handler = upstream.http2RequestHandlers?.find(i => i.isMatching(method, path, context, headers));
       }
 
       if (handler) {
@@ -461,17 +478,18 @@ export class Prxi {
    * Find WS handler across all the configs
    * @param configs
    * @param path
+   * @param headers
    * @returns
    */
-  private findWebSocketHandler(configs: UpstreamConfiguration[], path: string): {
+  private findWebSocketHandler(configs: UpstreamConfiguration[], path: string, headers: IncomingHttpHeaders): {
     proxy: Proxy | null,
     handler: WebSocketHandlerConfig | null,
     upstream: UpstreamConfiguration | null,
-    context: Record<string, any>
+    context: Record<string, any>,
   } | null {
     const context = {};
     for (const upstream of configs) {
-      const handler = upstream.webSocketHandlers?.find(i => i.isMatching(path, context));
+      const handler = upstream.webSocketHandlers?.find(i => i.isMatching(path, context, headers));
       if (handler) {
         const proxy = this.proxies.find(p => p.upstream === upstream);
         return {

@@ -62,6 +62,7 @@ export class Http2ProxyHandler {
    * @param id
    * @param req
    * @param res
+   * @param context
    * @param proxyConfiguration
    */
   public async proxy(
@@ -69,6 +70,7 @@ export class Http2ProxyHandler {
     session: Http2Session,
     stream: ServerHttp2Stream,
     headers: OutgoingHttpHeaders,
+    context: Record<string, any>,
     proxyConfiguration?: ProxyRequestConfiguration,
   ): Promise<void> {
     // istanbul ignore next
@@ -102,7 +104,7 @@ export class Http2ProxyHandler {
 
         /* istanbul ignore else */
         if (proxyConfiguration && proxyConfiguration.onBeforeProxyRequest) {
-          proxyConfiguration.onBeforeProxyRequest(null, requestHeadersToSend);
+          proxyConfiguration.onBeforeProxyRequest(null, requestHeadersToSend, context);
         }
 
         const proxyReq = client.request(requestHeadersToSend);
@@ -123,7 +125,7 @@ export class Http2ProxyHandler {
 
           /* istanbul ignore else */
           if (proxyConfiguration && proxyConfiguration.onBeforeResponse) {
-            proxyConfiguration.onBeforeResponse(null, headersToSet);
+            proxyConfiguration.onBeforeResponse(null, headersToSet, context);
           }
 
           stream.respond(headersToSet);

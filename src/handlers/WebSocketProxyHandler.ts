@@ -31,6 +31,7 @@ export class WebSocketProxyHandler {
    * @param req
    * @param socket
    * @param head
+   * @param context
    * @param proxyConfiguration
    */
   public async proxy(
@@ -38,6 +39,7 @@ export class WebSocketProxyHandler {
     req: IncomingMessage,
     socket: Socket,
     head: Buffer,
+    context: Record<string, any>,
     proxyConfiguration?: ProxyRequestConfiguration,
   ): Promise<void> {
     try {
@@ -80,7 +82,7 @@ export class WebSocketProxyHandler {
 
       /* istanbul ignore else */
       if (proxyConfiguration && proxyConfiguration.onBeforeProxyRequest) {
-        proxyConfiguration.onBeforeProxyRequest(options, options.headers);
+        proxyConfiguration.onBeforeProxyRequest(options, options.headers, context);
       }
 
       const client = request(options);

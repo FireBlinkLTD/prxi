@@ -1,6 +1,6 @@
 import {suite, test, context} from '@testdeck/mocha';
 import { TestServer, TestProxy, TestProxyParams, assertReject } from './helpers';
-import {deepEqual, strictEqual} from 'assert';
+import {deepEqual, ok, strictEqual} from 'assert';
 import {io} from 'socket.io-client';
 import { Configuration, ProxyRequest, WebSocketProxyCancelRequest } from '../src';
 import { IncomingMessage } from 'http';
@@ -55,7 +55,30 @@ abstract class BaseHttpProxySuccessSuite {
 
   @test()
   async echoRequest(): Promise<void> {
-    await this.initProxy();
+    let c: Record<string, any>;
+    await this.initProxy({
+      on: {
+        beforeHTTPRequest: (req, res, context) => {
+          c = context;
+          context.beforeTheRequest = 'HTTP';
+        },
+
+        afterHTTPRequest: (req, res, context) => {
+          c = context;
+          context.afterTheRequest = 'HTTP';
+        },
+
+        beforeHTTP2Request: (stream, headers, context) => {
+          c = context;
+          context.beforeTheRequest = 'HTTP2';
+        },
+
+        afterHTTP2Request: (stream, headers, context) => {
+          c = context;
+          context.afterTheRequest = 'HTTP2';
+        }
+      }
+    });
 
     const testData = [];
     for (let i = 0; i < 1000 * 1000; i++) {
@@ -64,6 +87,10 @@ abstract class BaseHttpProxySuccessSuite {
 
     const result = await new FetchHelpers(this.mode, this.secure).post(`${this.proxyUrl}/echo`, testData);
     deepEqual(result.data, testData);
+
+    ok(c);
+    strictEqual(c.beforeTheRequest, this.mode);
+    strictEqual(c.afterTheRequest, this.mode);
   }
 
   @test()
@@ -195,7 +222,14 @@ abstract class BaseHttpProxySuccessSuite {
       return;
     }
 
-    await this.initProxy();
+    let onUpgrade = false;
+    await this.initProxy({
+      on: {
+        upgrade: (req, socket, head) => {
+          onUpgrade = true;
+        }
+      }
+    });
     const sio = io(this.proxyUrl, {
       transports: ['websocket'],
       reconnection: false,
@@ -225,6 +259,7 @@ abstract class BaseHttpProxySuccessSuite {
     });
 
     strictEqual(received, send);
+    ok(onUpgrade);
   }
 
   @test()

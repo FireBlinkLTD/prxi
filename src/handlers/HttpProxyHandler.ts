@@ -19,12 +19,14 @@ export class HttpProxyHandler {
    * @param id
    * @param req
    * @param res
+   * @param context
    * @param proxyConfiguration
    */
   public async proxy(
     requestId: number,
     req: Request,
     res: Response,
+    context: Record<string, any>,
     proxyConfiguration?: ProxyRequestConfiguration,
   ): Promise<void> {
     // istanbul ignore next
@@ -63,7 +65,7 @@ export class HttpProxyHandler {
 
     /* istanbul ignore else */
     if (proxyConfiguration && proxyConfiguration.onBeforeProxyRequest) {
-      proxyConfiguration.onBeforeProxyRequest(options, options.headers);
+      proxyConfiguration.onBeforeProxyRequest(options, options.headers, context);
     }
 
     const client = request(options);
@@ -95,7 +97,7 @@ export class HttpProxyHandler {
 
         /* istanbul ignore else */
         if (proxyConfiguration && proxyConfiguration.onBeforeResponse) {
-          proxyConfiguration.onBeforeResponse(res, headersToSet);
+          proxyConfiguration.onBeforeResponse(res, headersToSet, context);
         }
 
         RequestUtils.updateResponseHeaders(res, headersToSet);

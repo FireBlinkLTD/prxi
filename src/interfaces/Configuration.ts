@@ -2,8 +2,10 @@ import { UpstreamConfiguration } from './UpstreamConfiguration';
 import { Request } from './Request';
 import { Response } from './Response';
 import { ServerHttp2Stream } from 'node:http2';
-import { IncomingHttpHeaders } from 'node:http';
+import { IncomingHttpHeaders } from 'node:http2';
 import { SecureContextOptions } from 'node:tls';
+import { Stream } from 'node:stream';
+import { Socket } from 'node:net';
 
 export type ErrorHandler = (req: Request, res: Response, err: Error) => Promise<void>;
 export type Http2ErrorHandler = (stream: ServerHttp2Stream, headers: IncomingHttpHeaders, err: Error) => Promise<void>;
@@ -60,6 +62,14 @@ export interface Configuration {
    * Upstream configurations
    */
   upstream: UpstreamConfiguration[];
+
+  on?: {
+    beforeHTTPRequest?: (req: Request, res: Response, context: Record<string, any>) => void;
+    afterHTTPRequest?: (req: Request, res: Response, context: Record<string, any>) => void;
+    upgrade?: (req: Request, socket: Socket, head: Buffer) => void;
+    beforeHTTP2Request?: (stream: Stream, headers: IncomingHttpHeaders, context: Record<string, any>) => void;
+    afterHTTP2Request?: (stream: Stream, headers: IncomingHttpHeaders, context: Record<string, any>) => void;
+  }
 
   /**
    * Info log handler

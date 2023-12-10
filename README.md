@@ -28,14 +28,42 @@ import { ServerHttp2Stream } from 'node:http2';
 const proxy = new Prxi({
   // optional mode, can be HTTP or HTTP2, by default HTTP
   // When HTTP/2 is used, upstream services should be using HTTP/2 too
-  mode: 'HTTP'
+  mode: 'HTTP',
 
   // optional secure connection settings
   // by default disabled
   // NOTE: for secure WS connection upstream service should also use secure connection
   secure: {
     // For the list of available options please refer to https://nodejs.org/api/tls.html#tls_tls_createsecurecontext_options
-  }
+  },
+
+  // optional hooks
+  on: {
+    // optional hook to be called before HTTP/1.1 request
+    beforeHTTPRequest: (req: Request, res: Response, context: Record<string, any>): void {
+
+    },
+
+    // optional hook to be called after HTTP/1.1 request
+    afterHTTPRequest: (req: Request, res: Response, context: Record<string, any>): void {
+
+    },
+
+    // optional hook to be called on request upgrade
+    upgrade: (req: Request, socket: Socket, head: Buffer): void {
+
+    },
+
+    // optional hook to be called before HTTP/2 stream
+    beforeHTTP2Request: (stream: Stream, headers: IncomingHttpHeaders, context: Record<string, any>): void {
+
+    },
+
+    // optional hook to be called after HTTP/2 stream
+    afterHTTP2Request?: (stream: Stream, headers: IncomingHttpHeaders, context: Record<string, any>): void {
+
+    },
+  },
 
   // port to listen incoming requests on
   port: TestProxy.PORT,
@@ -134,7 +162,7 @@ const requestHandlers = [
   {
     // function to test the incoming request
     // if returns true `handle` function will process the request
-    isMatching: (method: HttpMethod, path: string, context: Record<string, any>): boolean => true,
+    isMatching: (method: HttpMethod, path: string, context: Record<string, any>, headers: IncomingHttpHeaders): boolean => true,
 
     /**
      * Request handler
@@ -176,20 +204,23 @@ const requestHandlers = [
 
         /**
          * Optional handler before making the proxy request
-         * @param options request options
-         * @returns
          */
-        onBeforeProxyRequest: (options: RequestOptions | null, proxyHeaders: OutgoingHttpHeaders) => {
+        onBeforeProxyRequest: (
+          options: RequestOptions | null,
+          proxyHeaders: OutgoingHttpHeaders,
+          context: Record<string, any>,
+        ) => {
 
         }
 
         /**
          * Optional handler before sending a response
-         * @param res
-         * @param outgoingHeaders
-         * @returns
          */
-        onBeforeResponse: (res: Response, outgoingHeaders: OutgoingHttpHeaders) => {
+        onBeforeResponse: (
+          res: Response,
+          outgoingHeaders: OutgoingHttpHeaders,
+          context: Record<string, any>,
+        ) => {
 
         }
       });
@@ -202,7 +233,7 @@ const http2RequestHandlers = [
   {
     // function to test the incoming request
     // if returns true `handle` function will process the request
-    isMatching: (method: HttpMethod, path: string, context: Record<string, any>): boolean => true,
+    isMatching: (method: HttpMethod, path: string, context: Record<string, any>, headers: IncomingHttpHeaders): boolean => true,
 
     /**
      * Stream handler
@@ -245,20 +276,24 @@ const http2RequestHandlers = [
         /**
          * Optional handler before making the proxy request
          * @param options - for HTTP/2 connection value is null
-         * @param proxyHeaders
-         * @returns
          */
-        onBeforeProxyRequest: (_: RequestOptions | null, proxyHeaders: OutgoingHttpHeaders) => {
+        onBeforeProxyRequest: (
+          options: RequestOptions | null,
+          proxyHeaders: OutgoingHttpHeaders,
+          context: Record<string, any>,
+        ) => {
 
         }
 
         /**
          * Optional handler before sending a response
          * @param res - for HTTP/2 connection value is null
-         * @param outgoingHeaders
-         * @returns
          */
-        onBeforeResponse: (_: Response, outgoingHeaders: OutgoingHttpHeaders) => {
+        onBeforeResponse: (
+          res: Response,
+          outgoingHeaders: OutgoingHttpHeaders,
+          context: Record<string, any>,
+        ) => {
 
         }
       }
@@ -271,7 +306,7 @@ const webSocketHandlers = [
   {
     // function to test the incoming request
     // if returns true `handle` function will process the request
-    isMatching: (path: string, context: Record<string, any>): boolean => true,
+    isMatching: (path: string, context: Record<string, any>, headers: IncomingHttpHeaders): boolean => true,
 
     /**
      * Request handler
@@ -315,10 +350,12 @@ const webSocketHandlers = [
         /**
          * Optional handler before making the proxy request
          * @param options request options, can be null for HTTP/2 request
-         * @parma proxyHeaders
-         * @returns
          */
-        onBeforeProxyRequest: (options: RequestOptions | null, proxyHeaders: OutgoingHttpHeaders) => {
+        onBeforeProxyRequest: (
+          options: RequestOptions | null,
+          proxyHeaders: OutgoingHttpHeaders,
+          context: Record<string, any>,
+        ) => {
 
         }
       );

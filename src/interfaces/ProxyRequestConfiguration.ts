@@ -24,16 +24,18 @@ export interface ProxyRequestConfiguration {
   /**
    * Optional handler before making the proxy request
    * @param options request options, can be null for HTTP/2 request
-   * @parma proxyHeaders
+   * @param proxyHeaders
+   * @param context
    * @returns
    */
-  onBeforeProxyRequest?: (options: RequestOptions | null, proxyHeaders: OutgoingHttpHeaders) => void;
+  onBeforeProxyRequest?: (options: RequestOptions | null, proxyHeaders: OutgoingHttpHeaders, context: Record<string, any>) => void;
 
   /**
    * Optional handler before sending a response
    * @param res can be null for the HTTP/2 response
    * @param outgoingHeaders
+   * @param context
    * @returns
    */
-  onBeforeResponse?: (res: Response | null, outgoingHeaders: OutgoingHttpHeaders) => void;
+  onBeforeResponse?: (res: Response | null, outgoingHeaders: OutgoingHttpHeaders, context: Record<string, any>) => void;
 }

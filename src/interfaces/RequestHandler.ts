@@ -2,11 +2,11 @@ import { Socket } from 'net';
 import { ProxyRequestConfiguration } from './ProxyRequestConfiguration';
 import { Request } from './Request';
 import { Response } from './Response';
-import { OutgoingHttpHeaders, ServerHttp2Stream } from 'node:http2';
+import { OutgoingHttpHeaders, ServerHttp2Stream, IncomingHttpHeaders } from 'node:http2';
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'OPTIONS' | 'HEAD';
-export type IsMatchingRequestFunction = (method: HttpMethod, path: string, context: Record<string, any>) => boolean;
-export type IsMatchingWebSocketFunction = (path: string, context: Record<string, any>) => boolean;
+export type IsMatchingRequestFunction = (method: HttpMethod, path: string, context: Record<string, any>, headers: IncomingHttpHeaders) => boolean;
+export type IsMatchingWebSocketFunction = (path: string, context: Record<string, any>, headers: IncomingHttpHeaders) => boolean;
 export type ProxyRequest = (configuration?: ProxyRequestConfiguration) => Promise<void>;
 export type WebSocketProxyCancelRequest = (status: number, description: string) => void;
 
