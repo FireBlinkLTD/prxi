@@ -7,8 +7,8 @@ import { SecureContextOptions } from 'node:tls';
 import { Stream } from 'node:stream';
 import { Socket } from 'node:net';
 
-export type ErrorHandler = (req: Request, res: Response, err: Error) => Promise<void>;
-export type Http2ErrorHandler = (stream: ServerHttp2Stream, headers: IncomingHttpHeaders, err: Error) => Promise<void>;
+export type ErrorHandler = (req: Request, res: Response, err: Error, context: Record<string, any>) => Promise<void>;
+export type Http2ErrorHandler = (stream: ServerHttp2Stream, headers: IncomingHttpHeaders, err: Error, context: Record<string, any>) => Promise<void>;
 
 export interface Configuration {
   /**

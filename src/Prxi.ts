@@ -194,7 +194,7 @@ export class Prxi {
           })
           .catch((err: Error) => {
             this.logError(`[${requestId}] [Prxi] Error occurred upon making the "${req.method}:${path}" request`, err);
-            errHandler(req, res, err)
+            errHandler(req, res, err, context)
             .catch(err => {
               this.logError(`[${requestId}] [Prxi] Unable to handle error with errorHandler`, err);
               this.send500Error(req, res);
@@ -205,7 +205,7 @@ export class Prxi {
         /* istanbul ignore next */
         this.configuration.on?.afterHTTPRequest?.(req, res, context);
         this.logError(`[${requestId}] [Prxi] Missing RequestHandler configuration for the "${req.method}:${path}" request`);
-        errorHandler(req, res, new Error(`Missing RequestHandler configuration for the "${req.method}:${path}" request`))
+        errorHandler(req, res, new Error(`Missing RequestHandler configuration for the "${req.method}:${path}" request`), context)
         .catch(err => {
           this.logError(`[${requestId}] [Prxi] Unable to handle error with errorHandler`, err);
           this.send500Error(req, res);
@@ -274,7 +274,7 @@ export class Prxi {
             })
             .catch((err: Error) => {
               this.logError(`[${requestId}] [Prxi] Error occurred upon making the "${method}:${path}" request`, err);
-              http2ErrHandler(stream, headers, err)
+              http2ErrHandler(stream, headers, err, context)
               .catch(err => {
                 this.logError(`[${requestId}] [Prxi] Unable to handle error with errorHandler`, err);
                 this.send500ErrorForHttp2(stream, headers);
@@ -284,7 +284,7 @@ export class Prxi {
             /* istanbul ignore next */
             this.configuration.on?.afterHTTP2Request?.(stream, headers, context);
             this.logError(`[${requestId}] [Prxi] Missing RequestHandler configuration for the "${method}:${path}" HTTP/2 request`);
-            http2ErrorHandler(stream, headers, new Error(`Missing RequestHandler configuration for the "${method}:${path}" HTTP/2 request`))
+            http2ErrorHandler(stream, headers, new Error(`Missing RequestHandler configuration for the "${method}:${path}" HTTP/2 request`), context)
             .catch(err => {
               this.logError(`[${requestId}] [Prxi] Unable to handle error with errorHandler`, err);
               this.send500ErrorForHttp2(stream, headers);
