@@ -115,14 +115,11 @@ export class Prxi {
     }
 
     this.proxies = upstreamConfigurations.map(upstream => {
-      let httpProxyHandler;
-      if (this.configuration.mode === 'HTTP') {
-        httpProxyHandler = new HttpProxyHandler(
-          this.logInfo,
-          this.configuration,
-          upstream,
-        );
-      }
+      const httpProxyHandler = new HttpProxyHandler(
+        this.logInfo,
+        this.configuration,
+        upstream,
+      );
 
       let http2ProxyHandler;
       if (this.configuration.mode === 'HTTP2') {
