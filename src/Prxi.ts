@@ -570,6 +570,10 @@ export class Prxi {
             s.destroy();
             this.sockets.delete(s);
           });
+
+          this.proxies.forEach(p => {
+            p.http2?.closeAllConnections();
+          });
         }
 
         server.close((err) => {
@@ -578,10 +582,14 @@ export class Prxi {
             return rej(err);
           }
 
+          this.proxies.forEach(p => {
+            p.http2?.closeAllConnections();
+          });
+
+          this.logInfo('Prxi stopped');
           res();
         });
       });
-      this.logInfo('Prxi stopped');
     } else {
       this.logInfo('Prxi stopping skipped, not running');
     }

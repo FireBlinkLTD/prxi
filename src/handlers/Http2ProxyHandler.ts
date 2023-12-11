@@ -44,7 +44,6 @@ export class Http2ProxyHandler {
     return connection;
   }
 
-
   /**
    * Close connection
    * @param session
@@ -55,6 +54,16 @@ export class Http2ProxyHandler {
       this.connections.delete(session);
       connection.close();
     }
+  }
+
+  /**
+   * Close all connections
+   */
+  public closeAllConnections(): void {
+    this.connections.forEach((connection) => {
+      connection.close();
+    });
+    this.connections = new Map();
   }
 
   /**
