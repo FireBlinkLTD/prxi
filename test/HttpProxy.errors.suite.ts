@@ -183,7 +183,7 @@ abstract class BaseHttpProxyErrorSuite {
       });
 
       const err = await assertReject(new Promise<void>((res, rej) => {
-        sio.on('connect_error', (err) => {
+        sio.once('connect_error', (err) => {
           rej(err);
         });
 
@@ -222,7 +222,7 @@ abstract class BaseHttpProxyErrorSuite {
           rej(new Error('Unable to connect to WS'));
         }, 2000);
 
-        sio.on('connect_error', (err) => {
+        sio.once('connect_error', (err) => {
           clearTimeout(t);
           rej(err);
         });
@@ -255,16 +255,16 @@ abstract class BaseHttpProxyErrorSuite {
           rej(new Error('Unable to connect to WS'));
         }, 2000);
 
-        sio.on('connect', () => {
+        sio.once('connect', () => {
           WebSocketProxyHandler.debug.upstreamRequest.emit('error', new Error('Upstream fake error'));
         });
 
-        sio.on('disconnect', (reason) => {
+        sio.once('disconnect', (reason) => {
           rej(new Error(reason));
         })
       }));
 
-      strictEqual(err.message, `transport close`);
+      strictEqual(err.message, `transport error`);
     }
 
     @test()
@@ -291,16 +291,16 @@ abstract class BaseHttpProxyErrorSuite {
           rej(new Error('Unable to connect to WS'));
         }, 2000);
 
-        sio.on('connect', () => {
+        sio.once('connect', () => {
           WebSocketProxyHandler.debug.upstreamSocket.emit('error', new Error('Proxy fake error'));
         });
 
-        sio.on('disconnect', (reason) => {
+        sio.once('disconnect', (reason) => {
           rej(new Error(reason));
         })
       }));
 
-      strictEqual(err.message, `transport close`);
+      strictEqual(err.message, `transport error`);
     }
 
     @test()
@@ -327,16 +327,16 @@ abstract class BaseHttpProxyErrorSuite {
           rej(new Error('Unable to connect to WS'));
         }, 2000);
 
-        sio.on('connect', () => {
+        sio.once('connect', () => {
           WebSocketProxyHandler.debug.incomingSocket.emit('error', new Error('Proxy fake error'));
         });
 
-        sio.on('disconnect', (reason) => {
+        sio.once('disconnect', (reason) => {
           rej(new Error(reason));
         })
       }));
 
-      strictEqual(err.message, `transport close`);
+      strictEqual(err.message, `transport error`);
     }
 
     @test()
@@ -363,7 +363,7 @@ abstract class BaseHttpProxyErrorSuite {
       });
 
       const err = await assertReject(new Promise<void>((res, rej) => {
-        sio.on('connect_error', (err) => {
+        sio.once('connect_error', (err) => {
           rej(err);
         });
 

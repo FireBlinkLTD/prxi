@@ -161,7 +161,7 @@ export class FetchHelpers {
         const { origin, pathname, search } = new URL(url);
         let client = connect(origin);
 
-        client.on('close', () => {
+        client.once('close', () => {
           console.log(`-> Connection closed (${count + 1} / ${this.repeat})`);
         })
 

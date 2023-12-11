@@ -146,7 +146,7 @@ export class TestServer {
               data += chunk;
             });
 
-            stream.on('end', () => {
+            stream.once('end', () => {
               process(JSON.parse(data));
             });
           } else {
@@ -166,7 +166,7 @@ export class TestServer {
             socket.emit('echo', msg);
           });
 
-          socket.on('disconnect', () => {
+          socket.once('disconnect', () => {
             console.log('Socket.IO disconnected');
           });
 
@@ -223,7 +223,7 @@ export class TestServer {
     req.on('data', chunk => {
       chunks.push(Buffer.from(chunk));
     })
-    req.on('end', () => {
+    req.once('end', () => {
       writeJson(res, Buffer.concat(chunks).toString('utf-8'));
     })
   }

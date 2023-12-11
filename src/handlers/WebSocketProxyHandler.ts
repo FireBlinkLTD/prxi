@@ -97,15 +97,14 @@ export class WebSocketProxyHandler {
         req.pipe(client);
 
         let ps: Socket = null;
-        client.on('error', (err) => {
+        client.once('error', (err) => {
           // istanbul ignore next
           ps?.destroy();
-          socket.end();
 
           reject(err);
         });
 
-        client.on('response', (res: IncomingMessage) => {
+        client.once('response', (res: IncomingMessage) => {
           this.logInfo(`[${requestId}] [WebSocketProxyHandler] Received response`);
 
           // istanbul ignore else
@@ -126,21 +125,20 @@ export class WebSocketProxyHandler {
           }
         });
 
-        client.on('upgrade', (proxyResponse: IncomingMessage, proxySocket: Socket, proxyHead: Buffer) => {
+        client.once('upgrade', (proxyResponse: IncomingMessage, proxySocket: Socket, proxyHead: Buffer) => {
           WebSocketProxyHandler.debug.upstreamSocket = proxySocket;
 
           ps = proxySocket;
           this.logInfo(`[${requestId}] [WebSocketProxyHandler] Upgrade received`);
 
-          proxySocket.on('error', (err) => {
+          proxySocket.once('error', (err) => {
             this.logError(`[${requestId}] [WebSocketProxyHandler] ProxySocket error`, err);
             ps.destroy();
-            socket.end();
 
             reject(err);
           });
 
-          proxySocket.on('end', () => {
+          proxySocket.once('end', () => {
             this.logInfo(`[${requestId}] [WebSocketProxyHandler] ProxySocket end`);
             resolve();
           });
@@ -152,11 +150,9 @@ export class WebSocketProxyHandler {
           }
 
           // end proxy socket when incoming fails
-          socket.on('error', (err) => {
+          socket.once('error', (err) => {
             this.logError(`[${requestId}] [WebSocketProxyHandler] Socket error`, err);
-
             ps.destroy();
-            socket.end();
 
             reject(err);
           });

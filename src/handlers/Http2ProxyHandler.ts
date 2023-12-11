@@ -33,11 +33,11 @@ export class Http2ProxyHandler {
     connection = connect(target);
     this.connections.set(session, connection);
 
-    connection.on('close', () => {
+    connection.once('close', () => {
       this.closeConnection(session, connection);
     });
 
-    session.on('close', () => {
+    session.once('close', () => {
       this.closeConnection(session, connection);
     });
 
@@ -114,21 +114,21 @@ export class Http2ProxyHandler {
           reject(err);
         });
 
-        proxyReq.on('response', (headers, flags) => {
-          const headersToSet = RequestUtils.prepareProxyHeaders(
-            headers,
-            this.configuration.responseHeaders,
-            this.upstream.responseHeaders,
-            // istanbul ignore next
-            proxyConfiguration?.proxyResponseHeaders
-          );
-
-          /* istanbul ignore else */
-          if (proxyConfiguration && proxyConfiguration.onBeforeResponse) {
-            proxyConfiguration.onBeforeResponse(null, headersToSet, context);
-          }
-
+        proxyReq.once('response', (headers, flags) => {
           try {
+            const headersToSet = RequestUtils.prepareProxyHeaders(
+              headers,
+              this.configuration.responseHeaders,
+              this.upstream.responseHeaders,
+              // istanbul ignore next
+              proxyConfiguration?.proxyResponseHeaders
+            );
+
+             /* istanbul ignore else */
+            if (proxyConfiguration && proxyConfiguration.onBeforeResponse) {
+              proxyConfiguration.onBeforeResponse(null, headersToSet, context);
+            }
+
             /* istanbul ignore else */
             if (!stream.closed) {
               stream.respond(headersToSet);
@@ -140,10 +140,6 @@ export class Http2ProxyHandler {
             /* istanbul ignore next */
             resolve();
           }
-        });
-
-        proxyReq.on('error', (err) => {
-          this.logError(`[${requestId}] [Http2ProxyHandler] HTTP/2 stream error`, err);
         });
 
         proxyReq.once('end', () => {

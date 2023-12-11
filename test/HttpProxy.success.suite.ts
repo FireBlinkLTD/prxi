@@ -254,12 +254,12 @@ abstract class BaseHttpProxySuccessSuite {
         rej(new Error('Unable to connect to WS'));
       }, 2000);
 
-      sio.on('connect_error', (err) => {
+      sio.once('connect_error', (err) => {
         console.error('connection error', err);
       });
 
-      sio.on('connect', () => {
-        sio.on('echo', (msg: string) => {
+      sio.once('connect', () => {
+        sio.once('echo', (msg: string) => {
           received = msg;
           sio.disconnect();
           clearTimeout(timeout);
@@ -319,7 +319,7 @@ abstract class BaseHttpProxySuccessSuite {
         rej(new Error('Unable to connect to WS'));
       }, 2000);
 
-      sio.on('connect_error', (err) => {
+      sio.once('connect_error', (err) => {
         rej(err);
       });
     }));

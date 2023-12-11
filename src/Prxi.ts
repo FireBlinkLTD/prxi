@@ -344,7 +344,7 @@ export class Prxi {
           // cancel
           (status: number, description: string) => {
             this.logError(`[${requestId}] [Prxi] cancel websocket request with ${status}: ${description}`);
-            Prxi.closeSocket(req, socket, status, description, headersToSet);
+            this.closeSocket(req, socket, status, description, headersToSet);
           },
           path,
           context
@@ -354,7 +354,7 @@ export class Prxi {
         })
         .catch(err => {
           this.logError(`[${requestId}] [Prxi] Unable to handle websocket request`, err);
-          Prxi.closeSocket(req, socket, 500, 'Unexpected error ocurred', headersToSet);
+          this.closeSocket(req, socket, 500, 'Unexpected error ocurred', headersToSet);
         });
       } else {
         /* istanbul ignore next */
@@ -366,7 +366,7 @@ export class Prxi {
           this.configuration.responseHeaders,
         );
 
-        Prxi.closeSocket(req, socket, 405, 'Upgrade could not be processed', headersToSet);
+        this.closeSocket(req, socket, 405, 'Upgrade could not be processed', headersToSet);
       }
     });
 
@@ -455,9 +455,20 @@ export class Prxi {
    * @param description
    * @param headers
    */
-  private static closeSocket(req: IncomingMessage, socket: Socket, status: number, message: string, headers: OutgoingHttpHeaders): void {
-    socket.write(WebSocketUtils.prepareRawHeadersString(`HTTP/${req.httpVersion} ${status} ${message}`, headers));
-    socket.destroy();
+  private closeSocket(req: IncomingMessage, socket: Socket, status: number, message: string, headers: OutgoingHttpHeaders): void {
+    try {
+      socket.write(WebSocketUtils.prepareRawHeadersString(`HTTP/${req.httpVersion} ${status} ${message}`, headers), (err) => {
+        /* istanbul ignore next */
+        if (err) {
+          this.logError(`Prxi can't write upon socket closure`, err);
+        }
+
+        socket.destroy();
+      });
+    } catch (e) {
+      /* istanbul ignore next */
+      this.logError(`Prxi can't close socket`, e);
+    }
   }
 
   /**
