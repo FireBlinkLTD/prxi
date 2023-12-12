@@ -573,6 +573,7 @@ export class Prxi {
 
           this.proxies.forEach(p => {
             p.http2?.closeAllConnections();
+            p.ws?.closeAllConnections();
           });
         }
 
@@ -584,6 +585,7 @@ export class Prxi {
 
           this.proxies.forEach(p => {
             p.http2?.closeAllConnections();
+            p.ws?.closeAllConnections();
           });
 
           this.logInfo('Prxi stopped');

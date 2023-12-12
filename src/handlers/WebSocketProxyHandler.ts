@@ -16,6 +16,8 @@ interface DebugInterface {
 }
 
 export class WebSocketProxyHandler {
+  private activeSockets = new Set<Socket>();
+
   constructor(
     private logInfo: (msg: string) => void,
     private logError: (msg: string, err?: Error) => void,
@@ -24,6 +26,16 @@ export class WebSocketProxyHandler {
   ) {}
 
   public static readonly debug: DebugInterface = {}
+
+  /**
+   * Close all connections
+   */
+  public closeAllConnections(): void {
+    this.activeSockets.forEach((socket) => {
+      socket.destroy();
+    });
+    this.activeSockets = new Set<Socket>();
+  }
 
   /**
    * Proxy request
@@ -129,30 +141,34 @@ export class WebSocketProxyHandler {
           WebSocketProxyHandler.debug.upstreamSocket = proxySocket;
 
           ps = proxySocket;
+          this.activeSockets.add(ps);
           this.logInfo(`[${requestId}] [WebSocketProxyHandler] Upgrade received`);
 
-          proxySocket.once('error', (err) => {
+          ps.once('error', (err) => {
             this.logError(`[${requestId}] [WebSocketProxyHandler] ProxySocket error`, err);
             ps.destroy();
+            this.activeSockets.delete(ps);
 
             reject(err);
           });
 
-          proxySocket.once('end', () => {
+          ps.once('end', () => {
             this.logInfo(`[${requestId}] [WebSocketProxyHandler] ProxySocket end`);
+            this.activeSockets.delete(ps);
             resolve();
           });
 
           // remove head from the proxySocket
           // istanbul ignore next
           if (proxyHead && proxyHead.length) {
-            proxySocket.unshift(proxyHead);
+            ps.unshift(proxyHead);
           }
 
           // end proxy socket when incoming fails
           socket.once('error', (err) => {
             this.logError(`[${requestId}] [WebSocketProxyHandler] Socket error`, err);
             ps.destroy();
+            this.activeSockets.delete(ps);
 
             reject(err);
           });
