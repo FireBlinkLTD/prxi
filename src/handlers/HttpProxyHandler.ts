@@ -100,7 +100,7 @@ export class HttpProxyHandler {
           method,
           target,
           path: url,
-          response,
+          responseStatusCode: response.statusCode,
         });
 
         if (isKeepAliveRequest) {
@@ -133,7 +133,7 @@ export class HttpProxyHandler {
               method,
               target,
               path: url,
-              response,
+              responseStatusCode: response.statusCode,
             });
             resolve();
           });

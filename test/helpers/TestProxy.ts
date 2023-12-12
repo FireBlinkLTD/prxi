@@ -87,13 +87,13 @@ export class TestProxy {
       http2ErrorHandler: this.params.customHttp2ErrorHandler ? this.params.customHttp2ErrorHandler : (this.params.customHttp2ErrorHandler !== false ? this.errorHandler.bind(this) : null),
       log: {
         debug: (context, msg, params) => {
-          console.log(`[${new Date().toISOString()}] [DEBUG]`, msg, params);
+          console.log(`[${new Date().toISOString()}] [DEBUG]`, msg, JSON.stringify(params, null, 2));
         },
         info: (context, msg, params) => {
-          console.log(`[${new Date().toISOString()}] [INFO]`, msg, params);
+          console.log(`[${new Date().toISOString()}] [INFO]`, msg, JSON.stringify(params, null, 2));
         },
         error: (context, msg, error, params) => {
-          console.log(`[${new Date().toISOString()}] [INFO]`, msg, params, error);
+          console.log(`[${new Date().toISOString()}] [INFO]`, msg, JSON.stringify(params, null, 2), error);
         },
       },
       proxyRequestHeaders: {
