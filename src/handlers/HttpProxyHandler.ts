@@ -1,15 +1,17 @@
 import {request as httpRequest, RequestOptions, IncomingMessage} from 'node:http';
 import {request as httpsRequest} from 'node:https';
 
-import { Configuration, ProxyRequestConfiguration, Request, Response } from "../interfaces";
+import { Configuration, LogConfiguration, ProxyRequestConfiguration, Request, Response } from "../interfaces";
 import { UpstreamConfiguration } from "../interfaces/UpstreamConfiguration";
 import { RequestUtils } from "../utils";
 
 const emptyObj = {};
 
 export class HttpProxyHandler {
+  static LOG_CLASS = 'prxi/http';
+
   constructor(
-    private logInfo: (msg: string) => void,
+    private log: LogConfiguration,
     private configuration: Configuration,
     private upstream: UpstreamConfiguration,
   ) {}
@@ -23,7 +25,6 @@ export class HttpProxyHandler {
    * @param proxyConfiguration
    */
   public async proxy(
-    requestId: number,
     req: Request,
     res: Response,
     context: Record<string, any>,
@@ -43,7 +44,16 @@ export class HttpProxyHandler {
     const initialPath = new URL(target).pathname;
     const method = proxyConfiguration.method || req.method;
 
-    this.logInfo(`[${requestId}] [HttpProxyHandler] Processing HTTP/HTTPS proxy request with method ${method} to ${target}${url}`);
+    this.log.debug(
+      context,
+      'Processing HTTP/HTTPS proxy request',
+      {
+        class: HttpProxyHandler.LOG_CLASS,
+        method,
+        target,
+        path: url,
+      }
+    );
 
     const requestHeadersToSend = RequestUtils.prepareProxyHeaders(
       req.headers,
@@ -74,12 +84,25 @@ export class HttpProxyHandler {
       req.pipe(client);
 
       client.once('error', (err) => {
-        this.logInfo(`[${requestId}] [HttpProxyHandler] Proxy request failed for method ${method} to ${host}:${port}${url}, error: ${err.message}`);
+        this.log.error(context, `Proxy request failed`, err, {
+          class: HttpProxyHandler.LOG_CLASS,
+          method,
+          target,
+          path: url,
+        });
+
         reject(err);
       });
 
       client.once('response', (response: IncomingMessage) => {
-        this.logInfo(`[${requestId}] [HttpProxyHandler] Response received for method ${method} to ${host}:${port}${url}, status code ${response.statusCode}`);
+        this.log.debug(context, `Response received`,{
+          class: HttpProxyHandler.LOG_CLASS,
+          method,
+          target,
+          path: url,
+          response,
+        });
+
         if (isKeepAliveRequest) {
           client.setTimeout(0);
         }
@@ -105,7 +128,13 @@ export class HttpProxyHandler {
         // istanbul ignore else
         if (!res.writableEnded) {
           response.once('end', () => {
-            this.logInfo(`[${requestId}] [HttpProxyHandler] Proxy request with method ${method} to ${host}:${port}${url} completed`);
+            this.log.debug(context, `Proxy request completed`,{
+              class: HttpProxyHandler.LOG_CLASS,
+              method,
+              target,
+              path: url,
+              response,
+            });
             resolve();
           });
 

@@ -1,4 +1,4 @@
-import { Configuration, HttpMethod, ProxyRequestConfiguration, WebSocketHandlerConfig, Request, Response, Server, HttpRequestHandlerConfig, Http2RequestHandlerConfig  } from "./interfaces";
+import { Configuration, HttpMethod, ProxyRequestConfiguration, WebSocketHandlerConfig, Request, Response, Server, HttpRequestHandlerConfig, Http2RequestHandlerConfig, LogConfiguration  } from "./interfaces";
 import { Socket } from "net";
 import { RequestUtils, WebSocketUtils } from "./utils";
 import { HttpProxyHandler, Http2ProxyHandler, WebSocketProxyHandler } from "./handlers";
@@ -18,6 +18,9 @@ import {
   IncomingHttpHeaders,
   ServerOptions,
 } from "node:http2";
+import { Http2Session } from "http2";
+import { Stream } from "stream";
+import { Hooks } from "./Hooks";
 
 interface Proxy {
   upstream: UpstreamConfiguration,
@@ -27,11 +30,13 @@ interface Proxy {
 }
 
 export class Prxi {
+  static LOG_CLASS = 'prxi';
+
   private server: Server = null;
-  private logInfo: (message?: any, ...params: any[]) => void;
-  private logError: (message?: any, ...params: any[]) => void;
+  private log: LogConfiguration;
   private proxies: Proxy[];
   private sockets = new Set<Socket>();
+  private hooks: Hooks;
 
   constructor(private configuration: Configuration) {
     // set default values
@@ -41,20 +46,21 @@ export class Prxi {
     /* istanbul ignore next */
     configuration.mode = configuration.mode ?? 'HTTP';
 
-    const {logInfo, logError} = this.configuration;
-    this.logInfo = (message?: any, ...params: any[]) => {
-      /* istanbul ignore next */
-      if (logInfo) {
-        logInfo(`[${new Date().toISOString()}]`, message, ...params);
-      }
-    };
+    let { log } = this.configuration;
+    /* istanbul ignore next */
+    if (!log) {
+      log = {}
+    }
+    /* istanbul ignore next */
+    if (!log.debug) log.debug = () => {}
+    /* istanbul ignore next */
+    if (!log.info) log.info = () => {}
+    /* istanbul ignore next */
+    if (!log.error) log.error = () => {}
 
-    this.logError = (message?: any, ...params: any[]) => {
-      /* istanbul ignore next */
-      if (logError) {
-        logError(`[${new Date().toISOString()}]`, message, ...params);
-      }
-    };
+
+    this.log = log;
+    this.hooks = new Hooks(this.log, this.configuration);
   }
 
   /**
@@ -116,7 +122,7 @@ export class Prxi {
 
     this.proxies = upstreamConfigurations.map(upstream => {
       const httpProxyHandler = new HttpProxyHandler(
-        this.logInfo,
+        this.log,
         this.configuration,
         upstream,
       );
@@ -124,16 +130,14 @@ export class Prxi {
       let http2ProxyHandler;
       if (this.configuration.mode === 'HTTP2') {
         http2ProxyHandler = new Http2ProxyHandler(
-          this.logInfo,
-          this.logError,
+          this.log,
           this.configuration,
           upstream,
         );
       }
 
       const webSocketProxyHandler = new WebSocketProxyHandler(
-        this.logInfo,
-        this.logError,
+        this.log,
         this.configuration,
         upstream
       );
@@ -149,17 +153,24 @@ export class Prxi {
     let id = 0;
     // create server
     const server = this.createServer((req: Request, res: Response) => {
+      const context = {};
+
       if (this.configuration.mode === 'HTTP2' && req.httpVersion === "2.0") {
+        this.log.debug(context, 'HTTP/2 request processing ignored by the HTTP/1 handler when mode is "HTTP2"', {
+          class: Prxi.LOG_CLASS,
+        });
         // Ignore HTTP/2 requests
         return;
       }
 
-      const requestId = id++;
-      const context = {};
       const path = RequestUtils.getPath(req);
-      this.configuration.on?.beforeHTTPRequest?.(req, res, context);
+      this.hooks.onBeforeHttpRequest(path, req, res, context);
 
-      this.logInfo(`[${requestId}] [Prxi] Handling incoming request for method: ${req.method} and path: ${path}`);
+      this.log.debug(context, 'Handling incoming request', {
+        class: Prxi.LOG_CLASS,
+        method: req.method,
+        path,
+      });
       const {handler, upstream, proxy} = this.findRequestHandler('HTTP', upstreamConfigurations, <HttpMethod> req.method, path, req.headers, context);
       if (handler) {
         let errHandler = errorHandler;
@@ -182,59 +193,98 @@ export class Prxi {
             async (
               proxyConfiguration?: ProxyRequestConfiguration,
             ): Promise<void> => {
-              this.logInfo(`[${requestId}] [Prxi] Handling HTTP/1.1 proxy request for ${req.method} ${path}`);
-              await proxy.http.proxy(requestId, req, res, context, proxyConfiguration);
+              this.log.debug(context, 'Handling HTTP/1.1 proxy request', {
+                class: Prxi.LOG_CLASS,
+                method: req.method,
+                path,
+              });
+              await proxy.http.proxy(req, res, context, proxyConfiguration);
             },
             <HttpMethod> req.method,
             path,
             context
           )
           .finally(() => {
-            this.configuration.on?.afterHTTPRequest?.(req, res, context);
+            this.hooks.onAfterHttpRequest(path, req, res, context);
           })
           .catch((err: Error) => {
-            this.logError(`[${requestId}] [Prxi] Error occurred upon making the "${req.method}:${path}" request`, err);
+            this.log.error(context, 'Error occurred upon handling http/1.1 request', err, {
+              class: Prxi.LOG_CLASS,
+              method: req.method,
+              path,
+            });
             errHandler(req, res, err, context)
             .catch(err => {
-              this.logError(`[${requestId}] [Prxi] Unable to handle error with errorHandler`, err);
-              this.send500Error(req, res);
+              this.log.error(context, 'Unable to handle http/1.1 error with errorHandler', err, {
+                class: Prxi.LOG_CLASS,
+                method: req.method,
+                path,
+              });
+              this.send500Error(context, req.method, path, req, res);
             })
           }
         );
       } else {
         /* istanbul ignore next */
-        this.configuration.on?.afterHTTPRequest?.(req, res, context);
-        this.logError(`[${requestId}] [Prxi] Missing RequestHandler configuration for the "${req.method}:${path}" request`);
+        this.hooks.onAfterHttpRequest(path, req, res, context);
+        this.log.error(context, 'Missing HTTP/1 RequestHandler configuration', null, {
+          class: Prxi.LOG_CLASS,
+          method: req.method,
+          path,
+        });
         errorHandler(req, res, new Error(`Missing RequestHandler configuration for the "${req.method}:${path}" request`), context)
         .catch(err => {
-          this.logError(`[${requestId}] [Prxi] Unable to handle error with errorHandler`, err);
-          this.send500Error(req, res);
+          this.log.error(context, 'Unable to handle http/1.1 error with errorHandler', err, {
+            class: Prxi.LOG_CLASS,
+            method: req.method,
+            path,
+          });
+          this.send500Error(context, req.method, path, req, res);
         })
       }
     });
 
     if (this.configuration.mode === 'HTTP2') {
       server.on('session', (session) => {
+        const sessionContext: Record<string, any> = {};
+        (<any> session)._context = sessionContext;
+        this.hooks.onBeforeHTTP2Session(session, sessionContext);
+        session.once('close', () => {
+          this.hooks.onAfterHTTP2Session(session, sessionContext);
+        });
+
         /* istanbul ignore else */
         if (this.configuration.proxyRequestTimeout) {
           session.setTimeout(this.configuration.proxyRequestTimeout, () => {
-            this.logInfo(`[Prxi] HTTP/2 session timeout`);
+            this.log.debug(sessionContext, `HTTP/2 session timeout`, {
+              class: Prxi.LOG_CLASS,
+            });
             session.close();
           });
         }
 
         session.on('stream', (stream, headers) => {
+          const sessionContext = (<any> session)._context;
+          const context = {
+            ...sessionContext,
+          };
+
           /* istanbul ignore next */
           stream.on('error', (err) => {
-            this.logError(`[${requestId}] [Prxi] HTTP/2 stream error`, err);
+            this.log.error(context, `HTTP/2 stream error`, err, {
+              class: Prxi.LOG_CLASS,
+              headers,
+            });
           });
-
-          const requestId = id++;
-          const context = {};
-          this.configuration.on?.beforeHTTP2Request?.(stream, headers, context);
 
           const path = RequestUtils.getPathFromStr(headers[constants.HTTP2_HEADER_PATH].toString());
           const method = headers[constants.HTTP2_HEADER_METHOD].toString();
+
+          this.hooks.onBeforeHTTP2Request(method, path, stream, headers, context);
+          stream.once('close', () => {
+            this.hooks.onAfterHTTP2Request(method, path, stream, headers, context);
+          });
+
           const {handler, upstream, proxy} = this.findRequestHandler(
             'HTTP2',
             upstreamConfigurations,
@@ -262,32 +312,48 @@ export class Prxi {
               stream,
               headers,
               async (proxyConfiguration?: ProxyRequestConfiguration): Promise<void> => {
-                this.logInfo(`[${requestId}] [Prxi] Handling HTTP/2 proxy request for path: ${path}`);
-                await proxy.http2.proxy(requestId, session, stream, headersToSet, context, proxyConfiguration);
+                this.log.debug(context, 'Handling HTTP/2 proxy request', {
+                  class: Prxi.LOG_CLASS,
+                  path,
+                  method,
+                });
+                await proxy.http2.proxy(session, stream, headersToSet, context, proxyConfiguration);
               },
               <HttpMethod> method,
               path,
               context
             )
-            .finally(() => {
-              this.configuration.on?.afterHTTP2Request?.(stream, headers, context);
-            })
             .catch((err: Error) => {
-              this.logError(`[${requestId}] [Prxi] Error occurred upon making the "${method}:${path}" request`, err);
+              this.log.error(context, 'Error occurred upon making the HTTP/2 proxy request', err, {
+                class: Prxi.LOG_CLASS,
+                path,
+                method,
+              });
               http2ErrHandler(stream, headers, err, context)
               .catch(err => {
-                this.logError(`[${requestId}] [Prxi] Unable to handle error with errorHandler`, err);
-                this.send500ErrorForHttp2(stream, headers);
+                this.log.error(context, 'Unable to handle HTTP/2 error with errorHandler', err, {
+                  class: Prxi.LOG_CLASS,
+                  path,
+                  method,
+                });
+                this.send500ErrorForHttp2(context, method, path, stream, headers);
               })
             });
           } else {
             /* istanbul ignore next */
-            this.configuration.on?.afterHTTP2Request?.(stream, headers, context);
-            this.logError(`[${requestId}] [Prxi] Missing RequestHandler configuration for the "${method}:${path}" HTTP/2 request`);
+            this.log.error(context, 'Missing HTTP/2 RequestHandler configuration', null, {
+              class: Prxi.LOG_CLASS,
+              path,
+              method,
+            });
             http2ErrorHandler(stream, headers, new Error(`Missing RequestHandler configuration for the "${method}:${path}" HTTP/2 request`), context)
             .catch(err => {
-              this.logError(`[${requestId}] [Prxi] Unable to handle error with errorHandler`, err);
-              this.send500ErrorForHttp2(stream, headers);
+              this.log.error(context, 'Unable to handle HTTP/2 error with errorHandler', err, {
+                class: Prxi.LOG_CLASS,
+                path,
+                method,
+              });
+              this.send500ErrorForHttp2(context, method, path, stream, headers);
             })
           }
         });
@@ -296,8 +362,10 @@ export class Prxi {
 
     /* istanbul ignore next */
     server.on('clientError', (err) => {
-      this.logError(`[Prxi] Client Error`, err);
-    })
+      this.log.error({}, 'Client error', err), {
+        class: Prxi.LOG_CLASS,
+      };
+    });
 
     // keep track of all open connections
     server.on('connection', (connection: Socket) => {
@@ -312,14 +380,12 @@ export class Prxi {
 
     // handle upgrade action
     server.on('upgrade', (req: IncomingMessage, socket: Socket, head: Buffer) => {
-      const requestId = id++;
       const context = {};
-      this.configuration.on?.upgrade?.(req, socket, head, context);
 
       const path = RequestUtils.getPath(req);
       const {handler, proxy} = this.findWebSocketHandler(context, upstreamConfigurations, path, req.headers);
+      this.hooks.onUpgrade(path, req, socket, head, context);
 
-      this.logInfo(`[${requestId}] [Prxi] Upgrade event received on path: ${path}`);
       // handle websocket
       if (
         req.headers.upgrade.toLowerCase() === 'websocket'
@@ -338,35 +404,51 @@ export class Prxi {
           head,
           // handle
           async (proxyConfiguration?: ProxyRequestConfiguration): Promise<void> => {
-            this.logInfo(`[${requestId}] [Prxi] Handling WS proxy request for path: ${path}`);
-            await proxy.ws.proxy(requestId, req, socket, head, context, proxyConfiguration);
+            this.log.debug(context, 'Handling WS proxy request', {
+              class: Prxi.LOG_CLASS,
+              path
+            });
+            await proxy.ws.proxy(req, socket, head, context, proxyConfiguration);
           },
           // cancel
           (status: number, description: string) => {
-            this.logError(`[${requestId}] [Prxi] cancel websocket request with ${status}: ${description}`);
-            this.closeSocket(req, socket, status, description, headersToSet);
+            this.log.debug(context, 'Cancel WS request', {
+              class: Prxi.LOG_CLASS,
+              path,
+              status,
+              description
+            });
+            this.closeSocket(context, req.method, path, req, socket, status, description, headersToSet);
           },
           path,
           context
         )
         .finally(() => {
-          this.configuration.on?.afterUpgrade?.(req, socket, head, context);
+          this.hooks.onAfterUpgrade(path, req, socket, head, context);
         })
         .catch(err => {
-          this.logError(`[${requestId}] [Prxi] Unable to handle websocket request`, err);
-          this.closeSocket(req, socket, 500, 'Unexpected error ocurred', headersToSet);
+          this.log.error(context, 'Unable to handle WS request', err, {
+            class: Prxi.LOG_CLASS,
+            path,
+          });
+          this.closeSocket(context, req.method, path, req, socket, 500, 'Unexpected error ocurred', headersToSet);
         });
       } else {
         /* istanbul ignore next */
-        this.configuration.on?.afterUpgrade?.(req, socket, head, context);
-        this.logInfo(`[${requestId}] [Prxi] Unable to handle upgrade request`);
+        this.hooks.onAfterUpgrade(path, req, socket, head, context);
+        this.log.info(context, 'Unable to handle upgrade request', {
+          class: Prxi.LOG_CLASS,
+          path,
+          method: req.method,
+          upgrade: req.headers.upgrade,
+        });
 
         const headersToSet = RequestUtils.prepareProxyHeaders(
           {},
           this.configuration.responseHeaders,
         );
 
-        this.closeSocket(req, socket, 405, 'Upgrade could not be processed', headersToSet);
+        this.closeSocket(context, req.method, path, req, socket, 405, 'Upgrade could not be processed', headersToSet);
       }
     });
 
@@ -374,7 +456,13 @@ export class Prxi {
     await new Promise<void>(res => {
       server.listen(port, hostname, () => {
         this.server = server;
-        this.logInfo(`Prxi started listening on ${hostname}:${port}`);
+        this.log.info({}, 'Started listening for connections', {
+          class: Prxi.LOG_CLASS,
+          mode: this.configuration.mode,
+          secure: !!this.configuration.secure,
+          hostname,
+          port,
+        });
         res();
       });
     });
@@ -382,10 +470,13 @@ export class Prxi {
 
   /**
    * Send 500 error response
+   * @param context
+   * @param method
+   * @param path
    * @param req
    * @param res
    */
-  private send500ErrorForHttp2(stream: ServerHttp2Stream, headers: IncomingHttpHeaders): void {
+  private send500ErrorForHttp2(context: Record<string, any>, method: string, path: string, stream: ServerHttp2Stream, headers: IncomingHttpHeaders): void {
     /* istanbul ignore next */
     if (stream.closed) {
       return;
@@ -411,16 +502,23 @@ export class Prxi {
       stream.end(data);
     } catch (e) {
       /* istanbul ignore next */
-      this.logError(`Prxi failed to send 500 error`, e);
+      this.log.error(context, 'Failed to send 500 error over HTTP/2 connection', e, {
+        class: Prxi.LOG_CLASS,
+        method,
+        path,
+      });
     }
   }
 
   /**
    * Send 500 error response
+   * @param context
+   * @param method
+   * @param path
    * @param req
    * @param res
    */
-  private send500Error(req: Request, res: Response): void {
+  private send500Error(context: Record<string, any>, method: string, path: string, req: Request, res: Response): void {
     try {
       res.statusCode = 500;
       let data = 'Unexpected error occurred';
@@ -438,36 +536,55 @@ export class Prxi {
           res.end();
         } catch (e) {
           /* istanbul ignore next */
-          this.logError(`Prxi failed to send 500 error`, e);
+          this.log.error(context, 'Failed to send 500 error over HTTP/1 connection', e, {
+            class: Prxi.LOG_CLASS,
+            method,
+            path,
+          });
         }
       });
     } catch (e) {
       /* istanbul ignore next */
-      this.logError(`Prxi failed to send 500 error`, e);
+      this.log.error(context, 'Failed to send 500 error over HTTP/1 connection', e, {
+        class: Prxi.LOG_CLASS,
+        method,
+        path,
+      });
     }
   }
 
   /**
    * Close socket
+   * @param context
+   * @param method
+   * @param path
    * @param req
    * @param socket
    * @param status
    * @param description
    * @param headers
    */
-  private closeSocket(req: IncomingMessage, socket: Socket, status: number, message: string, headers: OutgoingHttpHeaders): void {
+  private closeSocket(context: Record<string, any>, method: string, path: string, req: IncomingMessage, socket: Socket, status: number, message: string, headers: OutgoingHttpHeaders): void {
     try {
       socket.write(WebSocketUtils.prepareRawHeadersString(`HTTP/${req.httpVersion} ${status} ${message}`, headers), (err) => {
         /* istanbul ignore next */
         if (err) {
-          this.logError(`Prxi can't write upon socket closure`, err);
+          this.log.error(context, "Can't write upon socket closure", err, {
+            class: Prxi.LOG_CLASS,
+            method,
+            path
+          });
         }
 
         socket.destroy();
       });
     } catch (e) {
       /* istanbul ignore next */
-      this.logError(`Prxi can't close socket`, e);
+      this.log.error(context, "Can't close socket", e, {
+        class: Prxi.LOG_CLASS,
+        method,
+        path
+      });
     }
   }
 
@@ -564,7 +681,9 @@ export class Prxi {
     if (server) {
       this.server = null;
       await new Promise<void>((res, rej) => {
-        this.logInfo('Stopping Prxi');
+        this.log.info({}, 'Stopping', {
+          class: Prxi.LOG_CLASS,
+        });
         if (force) {
           this.sockets.forEach(s => {
             s.destroy();
@@ -579,7 +698,9 @@ export class Prxi {
 
         server.close((err) => {
           if (err) {
-            this.logError('Failed to stop Prxi', err);
+            this.log.error({}, 'Failed to stop', err, {
+              class: Prxi.LOG_CLASS,
+            });
             return rej(err);
           }
 
@@ -588,12 +709,16 @@ export class Prxi {
             p.ws?.closeAllConnections();
           });
 
-          this.logInfo('Prxi stopped');
+          this.log.info(context, 'Stopped', {
+            class: Prxi.LOG_CLASS,
+          });
           res();
         });
       });
     } else {
-      this.logInfo('Prxi stopping skipped, not running');
+      this.log.info({}, 'Stop action skipped, not running', {
+        class: Prxi.LOG_CLASS,
+      });
     }
   }
 }

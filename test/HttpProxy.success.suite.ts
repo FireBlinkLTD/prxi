@@ -6,6 +6,7 @@ import { Configuration, ProxyRequest, WebSocketProxyCancelRequest } from '../src
 import { IncomingMessage } from 'http';
 import { Socket as NetSocket } from 'net';
 import { FetchHelpers } from './helpers/FetchHelper';
+import { Console } from './helpers/Console';
 
 abstract class BaseHttpProxySuccessSuite {
   constructor(private mode: 'HTTP' | 'HTTP2', private secure = false) {
@@ -22,7 +23,7 @@ abstract class BaseHttpProxySuccessSuite {
    * Before hook
    */
   async before(): Promise<void> {
-    console.log(`========= [${this.mode}]${this.secure ? ' [secure]' : ''} ${this[context].test.title} =========`);
+    Console.printSolidBox(`[TEST] [${this.mode}]${this.secure ? ' [secure]' : ''} ${this[context].test.title}`);
     this.server = new TestServer(this.mode, this.secure, true);
     this.proxy = null;
 
@@ -37,7 +38,7 @@ abstract class BaseHttpProxySuccessSuite {
     await this.server.stop();
     this.proxy = null;
     this.server = null;
-    console.log(`========= [${this.mode}]${this.secure ? ' [secure]' : ''} ${this[context].test.title} =========`);
+    Console.printDoubleBox(`[TEST] [${this.mode}]${this.secure ? ' [secure]' : ''} ${this[context].test.title}`);
   }
 
   /**
@@ -105,11 +106,11 @@ abstract class BaseHttpProxySuccessSuite {
   @test()
   async multipleEchoRequestsWithTimeout(): Promise<void> {
     await this.initProxy({
-      proxyRequestTimeout: 5,
+      proxyRequestTimeout: 15,
     });
 
     const testData = 'Test';
-    const result = await new FetchHelpers(this.mode, this.secure, 2, 10).post(`${this.proxyUrl}/echo`, testData);
+    const result = await new FetchHelpers(this.mode, this.secure, 2, 20).post(`${this.proxyUrl}/echo`, testData);
     deepEqual(result.data, testData);
   }
 

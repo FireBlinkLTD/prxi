@@ -40,29 +40,28 @@ const proxy = new Prxi({
   // optional hooks
   on: {
     // optional hook to be called before HTTP/1.1 request
-    beforeHTTPRequest: (req: Request, res: Response, context: Record<string, any>): void {
-
-    },
+    beforeHTTPRequest: (req: Request, res: Response, context: Record<string, any>): void { /* ... */ },
 
     // optional hook to be called after HTTP/1.1 request
-    afterHTTPRequest: (req: Request, res: Response, context: Record<string, any>): void {
-
-    },
+    afterHTTPRequest: (req: Request, res: Response, context: Record<string, any>): void { /* ... */ },
 
     // optional hook to be called on request upgrade
-    upgrade: (req: Request, socket: Socket, head: Buffer): void {
+    upgrade: (req: Request, socket: Socket, head: Buffer): void { /* ... */ },
 
-    },
+    // optional hook to be called after request upgrade processing
+    afterUpgrade: (req: Request, socket: Socket, head: Buffer): void { /* ... */ },
+
+    // optional hook to be called before HTTP/2 session processing
+    beforeHTTP2Session(session: Http2Session, context: Record<string, any>): void { /* ... */ },
+
+    // optional hook to be called after HTTP/2 session processing
+    afterHTTP2Session(session: Http2Session, context: Record<string, any>): void { /* ... */ },
 
     // optional hook to be called before HTTP/2 stream
-    beforeHTTP2Request: (stream: Stream, headers: IncomingHttpHeaders, context: Record<string, any>): void {
-
-    },
+    beforeHTTP2Request(stream: Stream, headers: IncomingHttpHeaders, context: Record<string, any>): void { /* ... */ },
 
     // optional hook to be called after HTTP/2 stream
-    afterHTTP2Request?: (stream: Stream, headers: IncomingHttpHeaders, context: Record<string, any>): void {
-
-    },
+    afterHTTP2Request?: (stream: Stream, headers: IncomingHttpHeaders, context: Record<string, any>): void { /* ... */ },
   },
 
   // port to listen incoming requests on
@@ -74,6 +73,17 @@ const proxy = new Prxi({
   // optional proxy request timeout in milliseconds (default value: 1 minute)
   proxyRequestTimeout: 30 * 1000,
 
+  // optional log handlers, by default no handlers
+  log: {
+    // optional handler of debug logs
+    debug(context, msg, params): void { /* ... */ },
+
+    // optional handler of info logs
+    info(context, msg, params): void { /* ... */ },
+
+    // optional handler of error logs
+    error(context, msg, error, params): void { /* ... */ },
+  }
   // log message function
   logInfo: console.log,
 
@@ -162,19 +172,21 @@ const requestHandlers = [
   {
     // function to test the incoming request
     // if returns true `handle` function will process the request
-    isMatching: (method: HttpMethod, path: string, context: Record<string, any>, headers: IncomingHttpHeaders): boolean => true,
+    isMatching(method: HttpMethod, path: string, context: Record<string, any>, headers: IncomingHttpHeaders): boolean {
+      return true
+    },
 
     /**
      * Request handler
      */
-    handle: async (
+    async handle(
       req: Request,
       res: Response,
       proxyRequest: ProxyRequest,
       method: HttpMethod,
       path: string,
       context: Record<string, any>
-    ): Promise<void> => {
+    ): Promise<void> {
       // proxy incoming request to the upstream
       // optionally pass ProxyRequestConfiguration object as a parameter
       await proxyRequest({
@@ -205,24 +217,20 @@ const requestHandlers = [
         /**
          * Optional handler before making the proxy request
          */
-        onBeforeProxyRequest: (
+        onBeforeProxyRequest(
           options: RequestOptions | null,
           proxyHeaders: OutgoingHttpHeaders,
           context: Record<string, any>,
-        ) => {
-
-        }
+        ): void { /* ... */ },
 
         /**
          * Optional handler before sending a response
          */
-        onBeforeResponse: (
+        onBeforeResponse(
           res: Response,
           outgoingHeaders: OutgoingHttpHeaders,
           context: Record<string, any>,
-        ) => {
-
-        }
+        ): void { /* ... */ },
       });
     }
   }
@@ -233,19 +241,21 @@ const http2RequestHandlers = [
   {
     // function to test the incoming request
     // if returns true `handle` function will process the request
-    isMatching: (method: HttpMethod, path: string, context: Record<string, any>, headers: IncomingHttpHeaders): boolean => true,
+    isMatching(method: HttpMethod, path: string, context: Record<string, any>, headers: IncomingHttpHeaders): boolean {
+      return true;
+    },
 
     /**
      * Stream handler
      */
-    handle: async (
+    async handle(
       stream: ServerHttp2Stream,
       headers: OutgoingHttpHeaders,
       proxyRequest: ProxyRequest,
       method: HttpMethod,
       path: string,
       context: Record<string, any>
-    ): Promise<void> => {
+    ): Promise<void> {
       // proxy incoming request to the upstream
       // optionally pass ProxyRequestConfiguration object as a parameter
       await proxyRequest({
@@ -277,25 +287,21 @@ const http2RequestHandlers = [
          * Optional handler before making the proxy request
          * @param options - for HTTP/2 connection value is null
          */
-        onBeforeProxyRequest: (
+        onBeforeProxyRequest(
           options: RequestOptions | null,
           proxyHeaders: OutgoingHttpHeaders,
           context: Record<string, any>,
-        ) => {
-
-        }
+        ): void { /* ... */ },
 
         /**
          * Optional handler before sending a response
          * @param res - for HTTP/2 connection value is null
          */
-        onBeforeResponse: (
+        onBeforeResponse(
           res: Response,
           outgoingHeaders: OutgoingHttpHeaders,
           context: Record<string, any>,
-        ) => {
-
-        }
+        ): void { /* ... */ },
       }
     }
   }
@@ -306,12 +312,14 @@ const webSocketHandlers = [
   {
     // function to test the incoming request
     // if returns true `handle` function will process the request
-    isMatching: (path: string, context: Record<string, any>, headers: IncomingHttpHeaders): boolean => true,
+    isMatching(path: string, context: Record<string, any>, headers: IncomingHttpHeaders): boolean {
+      return true;
+    },
 
     /**
      * Request handler
      */
-    handle: async (
+    async handle(
       req: Request,
       socket: Socket,
       head: Buffer,
@@ -319,7 +327,7 @@ const webSocketHandlers = [
       cancelRequest: WebSocketProxyCancelRequest,
       path: string,
       context: Record<string, any>
-    ): Promise<void> => {
+    ): Promise<void> {
       // proxy incoming request to the upstream
       // optionally pass ProxyRequestConfiguration object as a parameter
       await proxyRequest(
@@ -351,13 +359,11 @@ const webSocketHandlers = [
          * Optional handler before making the proxy request
          * @param options request options, can be null for HTTP/2 request
          */
-        onBeforeProxyRequest: (
+        onBeforeProxyRequest(
           options: RequestOptions | null,
           proxyHeaders: OutgoingHttpHeaders,
           context: Record<string, any>,
-        ) => {
-
-        }
+        ): void { /* ... */ },
       );
 
       // alternatively cancel request with custom http status code and message

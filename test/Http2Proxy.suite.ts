@@ -3,6 +3,7 @@ import { TestServer, TestProxy, TestProxyParams } from './helpers';
 import {deepEqual, strictEqual} from 'assert';
 import { Configuration } from '../src';
 import { FetchHelpers } from './helpers/FetchHelper';
+import { Console } from './helpers/Console';
 
 @suite()
 abstract class Http2ProxySuite {
@@ -20,7 +21,7 @@ abstract class Http2ProxySuite {
    * Before hook
    */
   async before(): Promise<void> {
-    console.log(`========= [${this.mode}]${this.secure ? ' [secure]' : ''} ${this[context].test.title} =========`);
+    Console.printSolidBox(`[TEST] [${this.mode}]${this.secure ? ' [secure]' : ''} ${this[context].test.title}`);
     this.server = new TestServer('HTTP2', true, true);
     this.proxy = null;
 
@@ -33,7 +34,7 @@ abstract class Http2ProxySuite {
   async after(): Promise<void> {
     await this.proxy?.stop();
     await this.server?.stop();
-    console.log(`========= [${this.mode}]${this.secure ? ' [secure]' : ''} ${this[context].test.title} =========`);
+    Console.printDoubleBox(`[TEST] [${this.mode}]${this.secure ? ' [secure]' : ''} ${this[context].test.title}`);
   }
 
   /**
@@ -60,6 +61,52 @@ abstract class Http2ProxySuite {
       .post(`${this.proxyUrl}/echo`, testData);
 
     strictEqual(resp.data.error, 'Unexpected error occurred');
+  }
+
+  @test()
+  async sessionHooks(): Promise<void> {
+    let sessionCtx;
+    let requestCtx;
+    await this.initProxy({
+      on: {
+        beforeHTTP2Session(session, ctx) {
+          ctx.beforeHTTP2Session = true;
+          sessionCtx = ctx;
+        },
+
+        afterHTTP2Session(session, ctx) {
+          ctx.afterHTTP2Session = true;
+          sessionCtx = ctx;
+        },
+
+        beforeHTTP2Request(stream, headers, ctx) {
+          ctx.beforeHTTP2Request = true;
+          requestCtx = ctx;
+        },
+
+        afterHTTP2Request(stream, headers, ctx) {
+          ctx.afterHTTP2Request = true;
+          requestCtx = ctx;;
+        },
+      }
+    });
+
+    await new FetchHelpers(this.mode, this.secure)
+      .post(`${this.proxyUrl}/echo`, 'test');
+
+    // need to wait a little bit to capture close event on session
+    await new Promise<void>(res => setTimeout(res, 10));
+
+    deepEqual(sessionCtx, {
+      beforeHTTP2Session: true,
+      afterHTTP2Session: true,
+    })
+
+    deepEqual(requestCtx, {
+      beforeHTTP2Session: true,
+      beforeHTTP2Request: true,
+      afterHTTP2Request: true,
+    })
   }
 
   @test()

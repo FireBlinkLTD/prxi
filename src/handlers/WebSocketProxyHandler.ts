@@ -3,7 +3,7 @@ import {request as httpRequest, RequestOptions} from 'node:http';
 import {request as httpsRequest} from 'node:https';
 import { Socket } from "node:net";
 
-import { Configuration, ProxyRequestConfiguration } from "../interfaces";
+import { Configuration, LogConfiguration, ProxyRequestConfiguration } from "../interfaces";
 import { UpstreamConfiguration } from "../interfaces/UpstreamConfiguration";
 import { RequestUtils, WebSocketUtils } from "../utils";
 
@@ -16,11 +16,12 @@ interface DebugInterface {
 }
 
 export class WebSocketProxyHandler {
+  static LOG_CLASS = 'prxi/ws';
+
   private activeSockets = new Set<Socket>();
 
   constructor(
-    private logInfo: (msg: string) => void,
-    private logError: (msg: string, err?: Error) => void,
+    private log: LogConfiguration,
     private configuration: Configuration,
     private upstream: UpstreamConfiguration,
   ) {}
@@ -47,7 +48,6 @@ export class WebSocketProxyHandler {
    * @param proxyConfiguration
    */
   public async proxy(
-    requestId: number,
     req: IncomingMessage,
     socket: Socket,
     head: Buffer,
@@ -73,7 +73,11 @@ export class WebSocketProxyHandler {
       const host = RequestUtils.getHost(target);
       const initialPath = new URL(target).pathname;
 
-      this.logInfo(`[${requestId}] [WebSocketProxyHandler] Processing WebSocket proxy request to ${target}${url}`);
+      this.log.debug(context, 'Processing', {
+        class: WebSocketProxyHandler.LOG_CLASS,
+        target,
+        path: url,
+      });
 
       const options: RequestOptions = {
         method: 'GET',
@@ -117,11 +121,19 @@ export class WebSocketProxyHandler {
         });
 
         client.once('response', (res: IncomingMessage) => {
-          this.logInfo(`[${requestId}] [WebSocketProxyHandler] Received response`);
+          this.log.debug(context, 'Proxy response received', {
+            class: WebSocketProxyHandler.LOG_CLASS,
+            target,
+            path: url,
+          });
 
           // istanbul ignore else
           if (!res.headers.upgrade) {
-            this.logInfo(`[${requestId}] [WebSocketProxyHandler] Response doesn't have an UPGRADE header`);
+            this.log.info(context, "Response doesn't have an UPGRADE header", {
+              class: WebSocketProxyHandler.LOG_CLASS,
+              target,
+              path: url,
+            });
 
             const headersToSet = RequestUtils.prepareProxyHeaders(
               res.headers,
@@ -142,10 +154,19 @@ export class WebSocketProxyHandler {
 
           ps = proxySocket;
           this.activeSockets.add(ps);
-          this.logInfo(`[${requestId}] [WebSocketProxyHandler] Upgrade received`);
+          this.log.debug(context, 'Upgrade received', {
+            class: WebSocketProxyHandler.LOG_CLASS,
+            target,
+            path: url,
+          });
 
           ps.once('error', (err) => {
-            this.logError(`[${requestId}] [WebSocketProxyHandler] ProxySocket error`, err);
+            this.log.error(context, 'Proxy socket error', err, {
+              class: WebSocketProxyHandler.LOG_CLASS,
+              target,
+              path: url,
+            });
+
             ps.destroy();
             this.activeSockets.delete(ps);
 
@@ -153,7 +174,11 @@ export class WebSocketProxyHandler {
           });
 
           ps.once('end', () => {
-            this.logInfo(`[${requestId}] [WebSocketProxyHandler] ProxySocket end`);
+            this.log.debug(context, 'Proxy socket ended', {
+              class: WebSocketProxyHandler.LOG_CLASS,
+              target,
+              path: url,
+            });
             this.activeSockets.delete(ps);
             resolve();
           });
@@ -166,7 +191,12 @@ export class WebSocketProxyHandler {
 
           // end proxy socket when incoming fails
           socket.once('error', (err) => {
-            this.logError(`[${requestId}] [WebSocketProxyHandler] Socket error`, err);
+            this.log.error(context, 'Socket error', err, {
+              class: WebSocketProxyHandler.LOG_CLASS,
+              target,
+              path: url,
+            });
+
             ps.destroy();
             this.activeSockets.delete(ps);
 

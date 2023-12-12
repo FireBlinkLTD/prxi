@@ -85,8 +85,17 @@ export class TestProxy {
 
       errorHandler: this.params.customErrorHandler ? this.params.customErrorHandler : (this.params.customErrorHandler !== false ? this.errorHandler.bind(this) : null),
       http2ErrorHandler: this.params.customHttp2ErrorHandler ? this.params.customHttp2ErrorHandler : (this.params.customHttp2ErrorHandler !== false ? this.errorHandler.bind(this) : null),
-      logInfo: console.log,
-      logError: console.error,
+      log: {
+        debug: (context, msg, params) => {
+          console.log(`[${new Date().toISOString()}] [DEBUG]`, msg, params);
+        },
+        info: (context, msg, params) => {
+          console.log(`[${new Date().toISOString()}] [INFO]`, msg, params);
+        },
+        error: (context, msg, error, params) => {
+          console.log(`[${new Date().toISOString()}] [INFO]`, msg, params, error);
+        },
+      },
       proxyRequestHeaders: {
         ReqConfigLevel: 'CONFIG-REQUEST',
         ReqConfigLevelOverwrite: 'CONFIG-REQUEST-OVERWRITE',

@@ -126,26 +126,38 @@ export class FetchHelpers {
 
   private async makeHttp1Request(method: string, url: string, headers: Record<string, string>, data?: unknown): Promise<any> {
     try {
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Connection': 'close',
-          'content-type': 'application/json',
-          'accept': 'application/json',
-          ...headers
-        },
-        body: data ? JSON.stringify(data) : undefined,
-      });
+      const makeRequest = async () => {
+        const response = await fetch(url, {
+          method,
+          headers: {
+            'Connection': 'close',
+            'content-type': 'application/json',
+            'accept': 'application/json',
+            ...headers
+          },
+          body: data ? JSON.stringify(data) : undefined,
+        });
 
-      const responseHeaders: Record<string, string> = {};
-      for (const header of response.headers.keys()) {
-        responseHeaders[header] = response.headers.get(header).toString();
+        const responseHeaders: Record<string, string> = {};
+        for (const header of response.headers.keys()) {
+          responseHeaders[header] = response.headers.get(header).toString();
+        }
+
+        return {
+          data: await response.json(),
+          headers: responseHeaders,
+        };
       }
 
-      return {
-        data: await response.json(),
-        headers: responseHeaders,
-      };
+      let result;
+      for (let i = 0; i <= this.repeat; i++) {
+        result = await makeRequest();
+        if (this.repeat > 0 && this.delayBetweenRepeats) {
+          await new Promise<void>(res => setTimeout(res, this.delayBetweenRepeats));
+        }
+      }
+
+      return result;
     } catch (err) {
       console.error(err);
       throw err;
@@ -202,6 +214,8 @@ export class FetchHelpers {
 
           req.once('end', () => {
             if (count + 1 === this.repeat) {
+              client.close();
+
               try {
                 res({
                   data: data ? JSON.parse(data) : undefined,
@@ -210,8 +224,6 @@ export class FetchHelpers {
               } catch (e) {
                 rej(e);
               }
-
-              client.close();
             } else {
               count++;
               setTimeout(() => {

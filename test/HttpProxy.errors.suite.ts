@@ -6,6 +6,7 @@ import {io} from 'socket.io-client';
 import { WebSocketProxyHandler } from '../src/handlers';
 import { FetchHelpers } from './helpers/FetchHelper';
 import { ServerHttp2Stream, constants } from 'http2';
+import { Console } from './helpers/Console';
 
 abstract class BaseHttpProxyErrorSuite {
     constructor(private mode: 'HTTP' | 'HTTP2', private secure = false) {
@@ -22,7 +23,7 @@ abstract class BaseHttpProxyErrorSuite {
      * Before hook
      */
     async before(): Promise<void> {
-      console.log(`========= [${this.mode}]${this.secure ? ' [secure]' : ''} ${this[context].test.title} =========`);
+      Console.printSolidBox(`[TEST] [${this.mode}]${this.secure ? ' [secure]' : ''} ${this[context].test.title}`);
       this.server = new TestServer(this.mode, this.secure, true);
       await this.server.start();
     }
@@ -35,7 +36,7 @@ abstract class BaseHttpProxyErrorSuite {
       await this.server.stop();
       this.proxy = null;
       this.server = null;
-      console.log(`========= [${this.mode}]${this.secure ? ' [secure]' : ''} ${this[context].test.title} =========`);
+      Console.printDoubleBox(`[TEST] [${this.mode}]${this.secure ? ' [secure]' : ''} ${this[context].test.title}`);
     }
 
     @test()

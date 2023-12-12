@@ -1,17 +1,17 @@
 import { ClientHttp2Session, Http2Session, OutgoingHttpHeaders, ServerHttp2Stream, connect, constants } from 'node:http2';
 
-import { Configuration, ProxyRequestConfiguration } from "../interfaces";
+import { Configuration, LogConfiguration, ProxyRequestConfiguration } from "../interfaces";
 import { UpstreamConfiguration } from "../interfaces/UpstreamConfiguration";
 import { RequestUtils } from "../utils";
 
 const emptyObj = {};
 
 export class Http2ProxyHandler {
+  static LOG_CLASS = 'prxi/http2';
   private connections: Map<Http2Session, ClientHttp2Session>;
 
   constructor(
-    private logInfo: (msg: string) => void,
-    private logError: (message?: any, ...params: any[]) => void,
+    private log: LogConfiguration,
     private configuration: Configuration,
     private upstream: UpstreamConfiguration,
   ) {
@@ -75,7 +75,6 @@ export class Http2ProxyHandler {
    * @param proxyConfiguration
    */
   public async proxy(
-    requestId: number,
     session: Http2Session,
     stream: ServerHttp2Stream,
     headers: OutgoingHttpHeaders,
@@ -88,74 +87,109 @@ export class Http2ProxyHandler {
     let target = proxyConfiguration.target || this.upstream.target;
     const initialPath = new URL(target).pathname;
 
-    this.logInfo(`[${requestId}] [Http2ProxyHandler] Processing proxy request to ${target}`);
+    this.log.debug(
+      context,
+      'Processing HTTP/2 proxy request',
+      {
+        class: Http2ProxyHandler.LOG_CLASS,
+        method: headers[constants.HTTP2_HEADER_METHOD],
+        target,
+        path: headers[constants.HTTP2_HEADER_PATH],
+      }
+    );
 
     await new Promise<void>((resolve, reject) => {
       const client = this.getOrCreateConnection(session, target);
 
       const handle = () => {
-        this.logInfo(`[${requestId}] [Http2ProxyHandler] Connected`);
+        try {
+          const path = RequestUtils.concatPath(initialPath, headers[constants.HTTP2_HEADER_PATH].toString());
+          const method = proxyConfiguration.method || headers[constants.HTTP2_HEADER_METHOD].toString();
 
-        const path = RequestUtils.concatPath(initialPath, headers[constants.HTTP2_HEADER_PATH].toString());
-        const method = proxyConfiguration.method || headers[constants.HTTP2_HEADER_METHOD].toString();
-        this.logInfo(`[${requestId}] [Http2ProxyHandler] Processing stream for ${method} ${path}`);
+          this.log.debug(context, 'Processing', {
+            class: Http2ProxyHandler.LOG_CLASS,
+            method: headers[constants.HTTP2_HEADER_METHOD],
+            target,
+            path: headers[constants.HTTP2_HEADER_PATH],
+            targetMethod: method,
+            targetPath: path,
+          });
 
-        headers[constants.HTTP2_HEADER_METHOD] = method;
-        headers[constants.HTTP2_HEADER_PATH] = path;
+          headers[constants.HTTP2_HEADER_METHOD] = method;
+          headers[constants.HTTP2_HEADER_PATH] = path;
 
-        const requestHeadersToSend = RequestUtils.prepareProxyHeaders(
-          headers,
-          this.configuration.proxyRequestHeaders,
-          this.upstream.proxyRequestHeaders,
-          // istanbul ignore next
-          proxyConfiguration?.proxyRequestHeaders,
-        );
+          const requestHeadersToSend = RequestUtils.prepareProxyHeaders(
+            headers,
+            this.configuration.proxyRequestHeaders,
+            this.upstream.proxyRequestHeaders,
+            // istanbul ignore next
+            proxyConfiguration?.proxyRequestHeaders,
+          );
 
-        /* istanbul ignore else */
-        if (proxyConfiguration && proxyConfiguration.onBeforeProxyRequest) {
-          proxyConfiguration.onBeforeProxyRequest(null, requestHeadersToSend, context);
-        }
-
-        const proxyReq = client.request(requestHeadersToSend);
-
-        proxyReq.once('error', (err) => {
-          this.logError(`[${requestId}] [Http2ProxyHandler] Proxy request failed, error: ${err.message}`);
-          reject(err);
-        });
-
-        proxyReq.once('response', (headers, flags) => {
-          try {
-            const headersToSet = RequestUtils.prepareProxyHeaders(
-              headers,
-              this.configuration.responseHeaders,
-              this.upstream.responseHeaders,
-              // istanbul ignore next
-              proxyConfiguration?.proxyResponseHeaders
-            );
-
-             /* istanbul ignore else */
-            if (proxyConfiguration && proxyConfiguration.onBeforeResponse) {
-              proxyConfiguration.onBeforeResponse(null, headersToSet, context);
-            }
-
-            /* istanbul ignore else */
-            if (!stream.closed) {
-              stream.respond(headersToSet);
-              proxyReq.pipe(stream);
-            }
-          } catch (e) {
-            /* istanbul ignore next */
-            this.logError(`[${requestId}] [Http2ProxyHandler] Unable to send response`, e);
-            /* istanbul ignore next */
-            resolve();
+          /* istanbul ignore else */
+          if (proxyConfiguration && proxyConfiguration.onBeforeProxyRequest) {
+            proxyConfiguration.onBeforeProxyRequest(null, requestHeadersToSend, context);
           }
-        });
 
-        proxyReq.once('end', () => {
-          resolve();
-        });
+          const proxyReq = client.request(requestHeadersToSend);
 
-        stream.pipe(proxyReq);
+          proxyReq.once('error', (err) => {
+            this.log.error(context, 'Request failed', err, {
+              class: Http2ProxyHandler.LOG_CLASS,
+              method: headers[constants.HTTP2_HEADER_METHOD],
+              target,
+              path: headers[constants.HTTP2_HEADER_PATH],
+              targetMethod: method,
+              targetPath: path,
+            });
+
+            reject(err);
+          });
+
+          proxyReq.once('response', (headers, flags) => {
+            try {
+              const headersToSet = RequestUtils.prepareProxyHeaders(
+                headers,
+                this.configuration.responseHeaders,
+                this.upstream.responseHeaders,
+                // istanbul ignore next
+                proxyConfiguration?.proxyResponseHeaders
+              );
+
+              /* istanbul ignore else */
+              if (proxyConfiguration && proxyConfiguration.onBeforeResponse) {
+                proxyConfiguration.onBeforeResponse(null, headersToSet, context);
+              }
+
+              /* istanbul ignore else */
+              if (!stream.closed) {
+                stream.respond(headersToSet);
+                proxyReq.pipe(stream);
+              }
+            } catch (e) {
+              /* istanbul ignore next */
+              this.log.error(context, 'Unable to send response', e, {
+                class: Http2ProxyHandler.LOG_CLASS,
+                method: headers[constants.HTTP2_HEADER_METHOD],
+                target,
+                path: headers[constants.HTTP2_HEADER_PATH],
+                targetMethod: method,
+                targetPath: path,
+              });
+              /* istanbul ignore next */
+              resolve();
+            }
+          });
+
+          proxyReq.once('end', () => {
+            resolve();
+          });
+
+          stream.pipe(proxyReq);
+        } catch (e) {
+          /* istanbul ignore next */
+          reject(e);
+        }
       }
 
       if (!client.connecting && !client.closed) {
@@ -166,7 +200,12 @@ export class Http2ProxyHandler {
       if (this.configuration.proxyRequestTimeout) {
         client.setTimeout(this.configuration.proxyRequestTimeout, () => {
           this.closeConnection(session, client);
-          this.logError(`[${requestId}] [Http2ProxyHandler] Proxy request timeout`);
+          this.log.error(context, 'Request timeout', null, {
+            class: Http2ProxyHandler.LOG_CLASS,
+            method: headers[constants.HTTP2_HEADER_METHOD],
+            target,
+            path: headers[constants.HTTP2_HEADER_PATH],
+          });
         });
       }
 
@@ -176,7 +215,12 @@ export class Http2ProxyHandler {
 
       client.once('error', (err) => {
         this.closeConnection(session, client);
-        this.logError(`[${requestId}] [Http2ProxyHandler] Proxy request failed, error: ${err.message}`);
+        this.log.error(context, 'Proxy request failed', err, {
+          class: Http2ProxyHandler.LOG_CLASS,
+          method: headers[constants.HTTP2_HEADER_METHOD],
+          target,
+          path: headers[constants.HTTP2_HEADER_PATH],
+        });
         reject(err);
       });
     });
