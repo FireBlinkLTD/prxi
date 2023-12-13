@@ -18,8 +18,6 @@ import {
   IncomingHttpHeaders,
   ServerOptions,
 } from "node:http2";
-import { Http2Session } from "http2";
-import { Stream } from "stream";
 import { Hooks } from "./Hooks";
 
 interface Proxy {
@@ -57,7 +55,6 @@ export class Prxi {
     if (!log.info) log.info = () => {}
     /* istanbul ignore next */
     if (!log.error) log.error = () => {}
-
 
     this.log = log;
     this.hooks = new Hooks(this.log, this.configuration);
@@ -381,11 +378,11 @@ export class Prxi {
     // handle upgrade action
     server.on('upgrade', (req: IncomingMessage, socket: Socket, head: Buffer) => {
       const context = {};
-
       const path = RequestUtils.getPath(req);
-      const {handler, proxy} = this.findWebSocketHandler(context, upstreamConfigurations, path, req.headers);
-      this.hooks.onUpgrade(path, req, socket, head, context);
 
+      this.hooks.onUpgrade(path, req, socket, head, context);
+      const {handler, proxy} = this.findWebSocketHandler(context, upstreamConfigurations, path, req.headers);
+      
       // handle websocket
       if (
         req.headers.upgrade.toLowerCase() === 'websocket'
