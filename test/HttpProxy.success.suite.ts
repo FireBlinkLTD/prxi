@@ -44,11 +44,15 @@ abstract class BaseHttpProxySuccessSuite {
   /**
    * Init proxy server
    */
-  private async initProxy(configOverride: Partial<Configuration> = {}): Promise<void> {
+  private async initProxy(configOverride: Partial<Configuration> = {}, extra?: Partial<TestProxyParams>): Promise<void> {
     const params = new TestProxyParams();
     params.configOverride = configOverride;
     params.mode = this.mode;
     params.secure = this.secure;
+
+    if (extra) {
+      params.onBeforeResponse = extra.onBeforeResponse;
+    }
 
     this.proxy = new TestProxy(params);
     await this.proxy.start();
@@ -166,6 +170,58 @@ abstract class BaseHttpProxySuccessSuite {
         test: '1',
       }
     });
+  }
+
+  @test()
+  async onBeforeResponseWithFailure(): Promise<void> {
+    await this.initProxy({}, {
+      onBeforeResponse (res, outgoingHeaders, context) {
+        throw new Error('Test');
+      },
+    });
+
+    const resp = await new FetchHelpers(this.mode, this.secure)
+      .post(`${this.proxyUrl}/echo`, {});
+
+    strictEqual(resp.data.error, 'Unexpected error occurred');
+  }
+
+  @test()
+  async onBeforeResponseWithAsyncFailure(): Promise<void> {
+    await this.initProxy({}, {
+      async onBeforeResponse (res, outgoingHeaders, context) {
+        throw new Error('Test');
+      },
+    });
+
+    const resp = await new FetchHelpers(this.mode, this.secure)
+      .post(`${this.proxyUrl}/echo`, {});
+
+    strictEqual(resp.data.error, 'Unexpected error occurred');
+  }
+
+  @test()
+  async onBeforeResponseMissing(): Promise<void> {
+    await this.initProxy({}, {
+      onBeforeResponse: false,
+    });
+
+    const resp = await new FetchHelpers(this.mode, this.secure)
+      .post(`${this.proxyUrl}/echo`, {});
+
+    deepEqual(resp.data, {});
+  }
+
+  @test()
+  async onBeforeResponseAsync(): Promise<void> {
+    await this.initProxy({}, {
+      onBeforeResponse: async () => {},
+    });
+
+    const resp = await new FetchHelpers(this.mode, this.secure)
+      .post(`${this.proxyUrl}/echo`, {});
+
+    deepEqual(resp.data, {});
   }
 
   @test()

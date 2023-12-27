@@ -37,5 +37,5 @@ export interface ProxyRequestConfiguration {
    * @param context
    * @returns
    */
-  onBeforeResponse?: (res: Response | null, outgoingHeaders: OutgoingHttpHeaders, context: Record<string, any>) => void;
+  onBeforeResponse?: (res: Response | null, outgoingHeaders: OutgoingHttpHeaders, context: Record<string, any>) => Promise<void> | void;
 }

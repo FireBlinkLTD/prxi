@@ -1,6 +1,6 @@
 import { IncomingMessage, ServerResponse } from 'node:http';
 import { Duplex } from 'stream';
-import { ErrorHandler, Prxi, ProxyRequest, WebSocketHandlerFunction, WebSocketHandlerConfig, Configuration, ProxyRequestConfiguration, Http2ErrorHandler } from '../../src';
+import { ErrorHandler, Prxi, ProxyRequest, WebSocketHandlerFunction, WebSocketHandlerConfig, Configuration, ProxyRequestConfiguration, Http2ErrorHandler, Response } from '../../src';
 import { TestServer } from './TestServer';
 import { RequestOptions } from 'node:https';
 import { OutgoingHttpHeaders } from 'node:http2';
@@ -10,6 +10,7 @@ import { resolve } from 'node:path';
 export class TestProxyParams {
   configOverride?: Partial<Configuration>;
   host?: string;
+  onBeforeResponse?: ((res: Response | null, outgoingHeaders: OutgoingHttpHeaders, context: Record<string, any>) => Promise<void> | void) | false;
   customErrorHandler?: ErrorHandler | false;
   customHttp2ErrorHandler?: Http2ErrorHandler | false;
   isMatching?: boolean | null;
@@ -131,6 +132,10 @@ export class TestProxy {
    * @param proxyRequest
    */
   private async handleOthers(req: IncomingMessage, res: ServerResponse, proxyRequest: ProxyRequest): Promise<void> {
+    const onBeforeResponse = (res: Response | null, outgoingHeaders: OutgoingHttpHeaders, context: Record<string, any>) => {
+      outgoingHeaders['ON_BEFORE_RESPONSE_HEADER'] = 'yes';
+    };
+
     await proxyRequest({
       proxyRequestHeaders: {
         REQProxyLevel: 'PROXY-REQUEST',
@@ -145,9 +150,7 @@ export class TestProxy {
       onBeforeProxyRequest: (options: RequestOptions, proxyHeaders: OutgoingHttpHeaders) => {
         proxyHeaders['ON_BEFORE_PROXY_HEADER'] = 'yes';
       },
-      onBeforeResponse: (res, outgoingHeaders) => {
-        outgoingHeaders['ON_BEFORE_RESPONSE_HEADER'] = 'yes';
-      }
+      onBeforeResponse: this.params.onBeforeResponse === false ? null : (this.params.onBeforeResponse || onBeforeResponse),
     });
   }
 

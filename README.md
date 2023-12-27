@@ -230,7 +230,7 @@ const requestHandlers = [
           res: Response,
           outgoingHeaders: OutgoingHttpHeaders,
           context: Record<string, any>,
-        ): void { /* ... */ },
+        ): Promise<void> | void { /* ... */ },
       });
     }
   }
@@ -301,7 +301,7 @@ const http2RequestHandlers = [
           res: Response,
           outgoingHeaders: OutgoingHttpHeaders,
           context: Record<string, any>,
-        ): void { /* ... */ },
+        ): Promise<void> | void { /* ... */ },
       }
     }
   }

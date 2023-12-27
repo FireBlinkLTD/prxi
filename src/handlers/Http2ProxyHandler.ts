@@ -2,7 +2,7 @@ import { ClientHttp2Session, Http2Session, OutgoingHttpHeaders, ServerHttp2Strea
 
 import { Configuration, LogConfiguration, ProxyRequestConfiguration } from "../interfaces";
 import { UpstreamConfiguration } from "../interfaces/UpstreamConfiguration";
-import { RequestUtils } from "../utils";
+import { RequestUtils, callOptionalPromiseFunction } from "../utils";
 
 const emptyObj = {};
 
@@ -147,37 +147,56 @@ export class Http2ProxyHandler {
           });
 
           proxyReq.once('response', (headers, flags) => {
-            try {
-              const headersToSet = RequestUtils.prepareProxyHeaders(
-                headers,
-                this.configuration.responseHeaders,
-                this.upstream.responseHeaders,
-                // istanbul ignore next
-                proxyConfiguration?.proxyResponseHeaders
+            const headersToSet = RequestUtils.prepareProxyHeaders(
+              headers,
+              this.configuration.responseHeaders,
+              this.upstream.responseHeaders,
+              // istanbul ignore next
+              proxyConfiguration?.proxyResponseHeaders
+            );
+
+            const next = () => {
+              try {
+                /* istanbul ignore else */
+                if (!stream.closed) {
+                  stream.respond(headersToSet);
+                  proxyReq.pipe(stream);
+                }
+              } catch (e) {
+                /* istanbul ignore next */
+                this.log.error(context, 'Unable to respond', e, {
+                  class: Http2ProxyHandler.LOG_CLASS,
+                  method: headers[constants.HTTP2_HEADER_METHOD],
+                  target,
+                  path: headers[constants.HTTP2_HEADER_PATH],
+                  targetMethod: method,
+                  targetPath: path,
+                });
+
+                /* istanbul ignore next */
+                resolve();
+              }
+            }
+
+            if (proxyConfiguration && proxyConfiguration.onBeforeResponse) {
+              callOptionalPromiseFunction(
+                () => proxyConfiguration.onBeforeResponse(null, headersToSet, context),
+                () => next(),
+                (err) => {
+                  this.log.error(context, 'onBeforeResponse function failed', err, {
+                    class: Http2ProxyHandler.LOG_CLASS,
+                    method: headers[constants.HTTP2_HEADER_METHOD],
+                    target,
+                    path: headers[constants.HTTP2_HEADER_PATH],
+                    targetMethod: method,
+                    targetPath: path,
+                  });
+
+                  reject(err);
+                }
               );
-
-              /* istanbul ignore else */
-              if (proxyConfiguration && proxyConfiguration.onBeforeResponse) {
-                proxyConfiguration.onBeforeResponse(null, headersToSet, context);
-              }
-
-              /* istanbul ignore else */
-              if (!stream.closed) {
-                stream.respond(headersToSet);
-                proxyReq.pipe(stream);
-              }
-            } catch (e) {
-              /* istanbul ignore next */
-              this.log.error(context, 'Unable to send response', e, {
-                class: Http2ProxyHandler.LOG_CLASS,
-                method: headers[constants.HTTP2_HEADER_METHOD],
-                target,
-                path: headers[constants.HTTP2_HEADER_PATH],
-                targetMethod: method,
-                targetPath: path,
-              });
-              /* istanbul ignore next */
-              resolve();
+            } else {
+              next();
             }
           });
 

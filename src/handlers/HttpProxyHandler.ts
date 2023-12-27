@@ -3,7 +3,7 @@ import {request as httpsRequest} from 'node:https';
 
 import { Configuration, LogConfiguration, ProxyRequestConfiguration, Request, Response } from "../interfaces";
 import { UpstreamConfiguration } from "../interfaces/UpstreamConfiguration";
-import { RequestUtils } from "../utils";
+import { RequestUtils, callOptionalPromiseFunction } from "../utils";
 
 const emptyObj = {};
 
@@ -118,29 +118,46 @@ export class HttpProxyHandler {
           proxyConfiguration?.proxyResponseHeaders
         );
 
-        /* istanbul ignore else */
-        if (proxyConfiguration && proxyConfiguration.onBeforeResponse) {
-          proxyConfiguration.onBeforeResponse(res, headersToSet, context);
+        const next = () => {
+          RequestUtils.updateResponseHeaders(res, headersToSet);
+
+          // istanbul ignore else
+          if (!res.writableEnded) {
+            response.once('end', () => {
+              this.log.debug(context, `Proxy request completed`,{
+                class: HttpProxyHandler.LOG_CLASS,
+                method,
+                target,
+                path: url,
+                responseStatusCode: response.statusCode,
+              });
+              resolve();
+            });
+
+            response.pipe(res);
+          } else {
+            resolve();
+          }
         }
 
-        RequestUtils.updateResponseHeaders(res, headersToSet);
+        /* istanbul ignore else */
+        if (proxyConfiguration && proxyConfiguration.onBeforeResponse) {
+          callOptionalPromiseFunction(
+            () => proxyConfiguration.onBeforeResponse(res, headersToSet, context),
+            () => next(),
+            (err) => {
+              this.log.error(context, 'onBeforeResponse function failed', err, {
+                class: HttpProxyHandler.LOG_CLASS,
+                method,
+                target,
+                path: url,
+              });
 
-        // istanbul ignore else
-        if (!res.writableEnded) {
-          response.once('end', () => {
-            this.log.debug(context, `Proxy request completed`,{
-              class: HttpProxyHandler.LOG_CLASS,
-              method,
-              target,
-              path: url,
-              responseStatusCode: response.statusCode,
-            });
-            resolve();
-          });
-
-          response.pipe(res);
+              reject(err);
+            }
+          )
         } else {
-          resolve();
+          next();
         }
       });
     });
