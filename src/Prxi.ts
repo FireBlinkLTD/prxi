@@ -382,7 +382,7 @@ export class Prxi {
 
       this.hooks.onUpgrade(path, req, socket, head, context);
       const {handler, proxy} = this.findWebSocketHandler(context, upstreamConfigurations, path, req.headers);
-      
+
       // handle websocket
       if (
         req.headers.upgrade.toLowerCase() === 'websocket'
@@ -706,7 +706,7 @@ export class Prxi {
             p.ws?.closeAllConnections();
           });
 
-          this.log.info(context, 'Stopped', {
+          this.log.info({}, 'Stopped', {
             class: Prxi.LOG_CLASS,
           });
           res();
