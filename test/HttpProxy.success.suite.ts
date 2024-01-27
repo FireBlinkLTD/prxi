@@ -59,6 +59,25 @@ abstract class BaseHttpProxySuccessSuite {
   }
 
   @test()
+  async closeOpenProxyRequest(): Promise<void> {
+    await this.initProxy();
+
+    const controller = new AbortController();
+    let error: Error;
+    const promise = new FetchHelpers(this.mode, this.secure).get(`${this.proxyUrl}/hold`, {}, controller).catch(
+      err => error = err
+    )
+
+    await new Promise<void>((res) => setTimeout(() => {
+      controller.abort();
+      res();
+    }, 20));
+    await promise;
+
+    strictEqual(error.message, 'This operation was aborted');
+  }
+
+  @test()
   async echoRequest(): Promise<void> {
     let c: Record<string, any>;
     await this.initProxy({

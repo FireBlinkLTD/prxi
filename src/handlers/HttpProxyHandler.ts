@@ -79,87 +79,98 @@ export class HttpProxyHandler {
     }
 
     const client = request(options);
+    let processed = false;
 
-    await new Promise<void>((resolve, reject) => {
-      req.pipe(client);
+    req.socket.once('close', () => {
+      if (processed) return;
 
-      client.once('error', (err) => {
-        this.log.error(context, `Proxy request failed`, err, {
-          class: HttpProxyHandler.LOG_CLASS,
-          method,
-          target,
-          path: url,
-        });
-
-        reject(err);
-      });
-
-      client.once('response', (response: IncomingMessage) => {
-        this.log.debug(context, `Response received`,{
-          class: HttpProxyHandler.LOG_CLASS,
-          method,
-          target,
-          path: url,
-          responseStatusCode: response.statusCode,
-        });
-
-        if (isKeepAliveRequest) {
-          client.setTimeout(0);
-        }
-
-        // map status code
-        res.statusCode = response.statusCode;
-
-        const headersToSet = RequestUtils.prepareProxyHeaders(
-          response.headers,
-          this.configuration.responseHeaders,
-          this.upstream.responseHeaders,
-          // istanbul ignore next
-          proxyConfiguration?.proxyResponseHeaders
-        );
-
-        const next = () => {
-          RequestUtils.updateResponseHeaders(res, headersToSet);
-
-          // istanbul ignore else
-          if (!res.writableEnded) {
-            response.once('end', () => {
-              this.log.debug(context, `Proxy request completed`,{
-                class: HttpProxyHandler.LOG_CLASS,
-                method,
-                target,
-                path: url,
-                responseStatusCode: response.statusCode,
-              });
-              resolve();
-            });
-
-            response.pipe(res);
-          } else {
-            resolve();
-          }
-        }
-
-        /* istanbul ignore else */
-        if (proxyConfiguration && proxyConfiguration.onBeforeResponse) {
-          callOptionalPromiseFunction(
-            () => proxyConfiguration.onBeforeResponse(res, headersToSet, context),
-            () => next(),
-            (err) => {
-              this.log.error(context, 'onBeforeResponse function failed', err, {
-                class: HttpProxyHandler.LOG_CLASS,
-                method,
-                target,
-                path: url,
-              });
-
-              reject(err);
-            }
-          )
-        } else {
-          next();
-        }
-      });
+      client.destroy(new Error('Request closed by the client'));
     });
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        req.pipe(client);
+
+        client.once('error', (err) => {
+          this.log.error(context, `Proxy request failed`, err, {
+            class: HttpProxyHandler.LOG_CLASS,
+            method,
+            target,
+            path: url,
+          });
+
+          reject(err);
+        });
+
+        client.once('response', (response: IncomingMessage) => {
+          this.log.debug(context, `Response received`,{
+            class: HttpProxyHandler.LOG_CLASS,
+            method,
+            target,
+            path: url,
+            responseStatusCode: response.statusCode,
+          });
+
+          if (isKeepAliveRequest) {
+            client.setTimeout(0);
+          }
+
+          // map status code
+          res.statusCode = response.statusCode;
+
+          const headersToSet = RequestUtils.prepareProxyHeaders(
+            response.headers,
+            this.configuration.responseHeaders,
+            this.upstream.responseHeaders,
+            // istanbul ignore next
+            proxyConfiguration?.proxyResponseHeaders
+          );
+
+          const next = () => {
+            RequestUtils.updateResponseHeaders(res, headersToSet);
+
+            // istanbul ignore else
+            if (!res.writableEnded) {
+              response.once('end', () => {
+                this.log.debug(context, `Proxy request completed`,{
+                  class: HttpProxyHandler.LOG_CLASS,
+                  method,
+                  target,
+                  path: url,
+                  responseStatusCode: response.statusCode,
+                });
+                resolve();
+              });
+
+              response.pipe(res);
+            } else {
+              resolve();
+            }
+          }
+
+          /* istanbul ignore else */
+          if (proxyConfiguration && proxyConfiguration.onBeforeResponse) {
+            callOptionalPromiseFunction(
+              () => proxyConfiguration.onBeforeResponse(res, headersToSet, context),
+              () => next(),
+              (err) => {
+                this.log.error(context, 'onBeforeResponse function failed', err, {
+                  class: HttpProxyHandler.LOG_CLASS,
+                  method,
+                  target,
+                  path: url,
+                });
+
+                reject(err);
+              }
+            )
+          } else {
+            next();
+          }
+        });
+      });
+    } finally {
+      processed = true;
+    }
   }
 }

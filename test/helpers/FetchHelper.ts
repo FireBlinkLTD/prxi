@@ -2,7 +2,7 @@ import { connect, constants } from 'node:http2';
 import path = require('node:path');
 
 export class FetchHelpers {
-  constructor(private mode: 'HTTP' | 'HTTP2', private secure: boolean, private repeat = 1, private delayBetweenRepeats = 0) {}
+  constructor(private mode: 'HTTP' | 'HTTP2', private secure: boolean, private repeat = 1, private delayBetweenRepeats = 0) { }
 
   public fixUrl(url: string): string {
     if (!this.secure) {
@@ -16,9 +16,10 @@ export class FetchHelpers {
    * Make GET request
    * @param url
    * @param headers
+   * @param controller
    * @returns
    */
-  async get(url: string, headers: Record<string, string> = {}): Promise<{
+  async get(url: string, headers: Record<string, string> = {}, controller?: AbortController): Promise<{
     data: any,
     headers: Record<string, string>,
   }> {
@@ -26,11 +27,11 @@ export class FetchHelpers {
     console.log(`-> [${this.mode}] Making GET request to ${url}`);
 
     if (this.mode === 'HTTP') {
-      return await this.getHttp1(url, headers);
+      return await this.getHttp1(url, headers, controller);
     }
 
     if (this.mode === 'HTTP2') {
-      return await this.getHttp2(url, headers);
+      return await this.getHttp2(url, headers, controller);
     }
 
     throw new Error(`Unable to make GET request for unhandled mode ${this.mode}`);
@@ -40,22 +41,24 @@ export class FetchHelpers {
    * Make HTTP/1.1 GET request
    * @param url
    * @param headers
+   * @param controller
    * @returns
    */
-  private async getHttp1(url: string, headers: Record<string, string>): Promise<{
+  private async getHttp1(url: string, headers: Record<string, string>, controller?: AbortController): Promise<{
     data: any,
     headers: Record<string, string>,
   }> {
-    return await this.makeHttp1Request('GET', url, headers);
+    return await this.makeHttp1Request('GET', url, headers, null, controller);
   }
 
-   /**
-   * Make HTTP/2 GET request
-   * @param url
-   * @param headers
-   * @returns
-   */
-   private async getHttp2(url: string, headers: Record<string, string>): Promise<{
+  /**
+  * Make HTTP/2 GET request
+  * @param url
+  * @param headers
+  * @param controller
+  * @returns
+  */
+  private async getHttp2(url: string, headers: Record<string, string>, controller?: AbortController): Promise<{
     data: any,
     headers: Record<string, string>,
   }> {
@@ -63,6 +66,8 @@ export class FetchHelpers {
       constants.HTTP2_METHOD_GET,
       url,
       headers,
+      null,
+      controller,
     );
   }
 
@@ -71,9 +76,10 @@ export class FetchHelpers {
    * @param url
    * @param data
    * @param headers
+   * @param controller
    * @returns
    */
-  async post(url: string, data: unknown, headers: Record<string, string> = {}): Promise<{
+  async post(url: string, data: unknown, headers: Record<string, string> = {}, controller?: AbortController): Promise<{
     data: any,
     headers: Record<string, string>,
   }> {
@@ -81,11 +87,11 @@ export class FetchHelpers {
     console.log(`-> [${this.mode}] Making POST request to ${url}`);
 
     if (this.mode === 'HTTP') {
-      return await this.postHttp1(url, data, headers);
+      return await this.postHttp1(url, data, headers, controller);
     }
 
     if (this.mode === 'HTTP2') {
-      return await this.postHttp2(url, data, headers);
+      return await this.postHttp2(url, data, headers, controller);
     }
 
     throw new Error(`Unable to make POST request for unhandled mode ${this.mode}`);
@@ -96,13 +102,20 @@ export class FetchHelpers {
    * @param url
    * @param data
    * @param headers
+   * @param AbortController
    * @returns
    */
-  private async postHttp1(url: string, data: unknown, headers: Record<string, string>): Promise<{
+  private async postHttp1(url: string, data: unknown, headers: Record<string, string>, controller?: AbortController): Promise<{
     data: any,
     headers: Record<string, string>,
   }> {
-    return await this.makeHttp1Request('POST', url, headers, data);
+    return await this.makeHttp1Request(
+      'POST',
+      url,
+      headers,
+      data,
+      controller,
+    );
   }
 
   /**
@@ -110,9 +123,10 @@ export class FetchHelpers {
    * @param url
    * @param data
    * @param headers
+   * @param controller
    * @returns
    */
-  private async postHttp2(url: string, data: unknown, headers: Record<string, string>): Promise<{
+  private async postHttp2(url: string, data: unknown, headers: Record<string, string>, controller?: AbortController): Promise<{
     data: any,
     headers: Record<string, string>,
   }> {
@@ -120,15 +134,17 @@ export class FetchHelpers {
       constants.HTTP2_METHOD_POST,
       url,
       headers,
-      data
+      data,
+      controller,
     );
   }
 
-  private async makeHttp1Request(method: string, url: string, headers: Record<string, string>, data?: unknown): Promise<any> {
+  private async makeHttp1Request(method: string, url: string, headers: Record<string, string>, data?: unknown, controller?: AbortController): Promise<any> {
     try {
       const makeRequest = async () => {
         const response = await fetch(url, {
           method,
+          signal: controller?.signal,
           headers: {
             'Connection': 'close',
             'content-type': 'application/json',
@@ -164,7 +180,7 @@ export class FetchHelpers {
     }
   }
 
-  private async makeHttp2Request(method: string, url: string, headers: Record<string, string>, data?: unknown): Promise<any> {
+  private async makeHttp2Request(method: string, url: string, headers: Record<string, string>, data?: unknown, controller?: AbortController): Promise<any> {
     const buffer = data ? Buffer.from(JSON.stringify(data)) : undefined;
 
     return new Promise<any>((res, rej) => {
@@ -194,6 +210,12 @@ export class FetchHelpers {
             ...headers,
           });
 
+          let aborted = false;
+          controller?.signal?.addEventListener('abort', () => {
+            aborted = true;
+            req.close();
+          })
+
           let responseHeaders: Record<string, string> = {};
           req.once('response', (headers, flags) => {
             for (const header of Object.keys(headers)) {
@@ -217,6 +239,10 @@ export class FetchHelpers {
               client.close();
 
               try {
+                if (aborted && !data) {
+                  return rej(new Error('This operation was aborted'));
+                }
+
                 res({
                   data: data ? JSON.parse(data) : undefined,
                   headers: responseHeaders,

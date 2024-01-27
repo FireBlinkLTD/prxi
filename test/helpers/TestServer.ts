@@ -85,6 +85,10 @@ export class TestServer {
             return this.handleHeaders(req, res);
           }
 
+          if (req.url.indexOf(`${this.prefix}/hold`) === 0) {
+            return;
+          }
+
           console.log(`Unable to find handler for URL: ${req.url}`);
           writeJson(res, JSON.stringify({
             message: 'Not found',
@@ -131,6 +135,10 @@ export class TestServer {
                 'RESConfigLevelOverwrite': 'RESConfigLevelOverwrite-test',
                 'RESProxyLevelClear': 'RESProxyLevelClear-test',
               })
+            }
+
+            if (path.indexOf(`${this.prefix}/hold`) === 0) {
+              return;
             }
 
             console.log(`Unable to find handler for path: ${path}`);
