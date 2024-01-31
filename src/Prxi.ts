@@ -19,6 +19,8 @@ import {
   ServerOptions,
 } from "node:http2";
 import { Hooks } from "./Hooks";
+import { randomUUID } from "crypto";
+import { Http2Stream } from "http2";
 
 interface Proxy {
   upstream: UpstreamConfiguration,
@@ -245,6 +247,10 @@ export class Prxi {
       server.on('session', (session) => {
         const sessionContext: Record<string, any> = {};
         (<any> session)._context = sessionContext;
+        (<any> session)._uuid = randomUUID();
+        (<any> session)._streams = new Set<Http2Stream>();
+
+        // register hooks
         this.hooks.onBeforeHTTP2Session(session, sessionContext);
         session.once('close', () => {
           this.hooks.onAfterHTTP2Session(session, sessionContext);
@@ -265,6 +271,7 @@ export class Prxi {
           const context = {
             ...sessionContext,
           };
+          (<any> session)._streams.add(stream);
 
           /* istanbul ignore next */
           stream.on('error', (err) => {
@@ -279,6 +286,7 @@ export class Prxi {
 
           this.hooks.onBeforeHTTP2Request(method, path, stream, headers, context);
           stream.once('close', () => {
+            (<any> session)._streams.delete(stream);
             this.hooks.onAfterHTTP2Request(method, path, stream, headers, context);
           });
 

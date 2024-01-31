@@ -1,4 +1,4 @@
-import { ClientHttp2Session, Http2Session, OutgoingHttpHeaders, ServerHttp2Stream, connect, constants } from 'node:http2';
+import { ClientHttp2Session, Http2Session, Http2Stream, OutgoingHttpHeaders, ServerHttp2Stream, connect, constants } from 'node:http2';
 
 import { Configuration, LogConfiguration, ProxyRequestConfiguration } from "../interfaces";
 import { UpstreamConfiguration } from "../interfaces/UpstreamConfiguration";
@@ -8,15 +8,14 @@ const emptyObj = {};
 
 export class Http2ProxyHandler {
   static LOG_CLASS = 'prxi/http2';
-  private connections: Map<Http2Session, ClientHttp2Session>;
+  private connections: Record<string, ClientHttp2Session> = {};
+  private sessions: Record<string, Http2Session> = {};
 
   constructor(
     private log: LogConfiguration,
     private configuration: Configuration,
     private upstream: UpstreamConfiguration,
-  ) {
-    this.connections = new Map();
-  }
+  ) {}
 
   /**
    * Get existing connection or create a new one
@@ -25,34 +24,60 @@ export class Http2ProxyHandler {
    * @returns
    */
   private getOrCreateConnection(session: Http2Session, target: string): ClientHttp2Session {
-    let connection = this.connections.get(session);
+    const uuid = Http2ProxyHandler.getSessionUUID(session);
+
+    if (!this.sessions[uuid]) {
+      this.sessions[uuid] = session;
+    }
+
+    let connection = this.connections[uuid];
     if (connection && !connection.closed) {
       return connection;
     }
 
     connection = connect(target);
-    this.connections.set(session, connection);
+    this.connections[uuid] = connection;
 
-    connection.once('close', () => {
-      this.closeConnection(session, connection);
+    connection.once('close', (e) => {
+      this.closeConnection(session, connection, true);
     });
 
     session.once('close', () => {
-      this.closeConnection(session, connection);
+      this.closeConnection(session, connection, false);
     });
 
     return connection;
   }
 
   /**
+   * Get session UUID
+   */
+  private static getSessionUUID(session: Http2Session): string {
+    return (<any> session)._uuid;
+  }
+
+  /**
    * Close connection
    * @param session
    * @param connection
+   * @param closeSession
    */
-  private closeConnection(session: Http2Session, connection: ClientHttp2Session): void {
-    if (this.connections.has(session)) {
-      this.connections.delete(session);
+  private closeConnection(session: Http2Session, connection: ClientHttp2Session, closeSession: boolean): void {
+    const uuid = Http2ProxyHandler.getSessionUUID(session);
+
+    if (this.connections[uuid]) {
+      delete this.connections[uuid];
       connection.close();
+
+      if (closeSession) {
+        (<any> session)._streams.forEach((stream: Http2Stream) => {
+          stream.close();
+        });
+
+        session.close();
+      }
+
+      delete this.sessions[uuid];
     }
   }
 
@@ -60,10 +85,13 @@ export class Http2ProxyHandler {
    * Close all connections
    */
   public closeAllConnections(): void {
-    this.connections.forEach((connection) => {
-      connection.close();
-    });
-    this.connections = new Map();
+    for (const uuid of Object.keys(this.connections)) {
+      this.connections[uuid].close();
+      this.sessions[uuid].close();
+    }
+
+    this.connections = {};
+    this.sessions = {};
   }
 
   /**
@@ -218,7 +246,7 @@ export class Http2ProxyHandler {
       /* istanbul ignore else */
       if (this.configuration.proxyRequestTimeout) {
         client.setTimeout(this.configuration.proxyRequestTimeout, () => {
-          this.closeConnection(session, client);
+          this.closeConnection(session, client, false);
           this.log.error(context, 'Request timeout', null, {
             class: Http2ProxyHandler.LOG_CLASS,
             method: headers[constants.HTTP2_HEADER_METHOD],
@@ -233,7 +261,7 @@ export class Http2ProxyHandler {
       });
 
       client.once('error', (err) => {
-        this.closeConnection(session, client);
+        this.closeConnection(session, client, false);
         this.log.error(context, 'Proxy request failed', err, {
           class: Http2ProxyHandler.LOG_CLASS,
           method: headers[constants.HTTP2_HEADER_METHOD],

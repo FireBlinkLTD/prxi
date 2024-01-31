@@ -35,7 +35,7 @@ abstract class BaseHttpProxySuccessSuite {
    */
   async after(): Promise<void> {
     await this.proxy?.stop();
-    await this.server.stop();
+    await this.server?.stop();
     this.proxy = null;
     this.server = null;
     Console.printDoubleBox(`[TEST] [${this.mode}]${this.secure ? ' [secure]' : ''} ${this[context].test.title}`);
@@ -59,7 +59,7 @@ abstract class BaseHttpProxySuccessSuite {
   }
 
   @test()
-  async closeOpenProxyRequest(): Promise<void> {
+  async closeOpenProxyRequestByClient(): Promise<void> {
     await this.initProxy();
 
     const controller = new AbortController();
@@ -75,6 +75,27 @@ abstract class BaseHttpProxySuccessSuite {
     await promise;
 
     strictEqual(error.message, 'This operation was aborted');
+  }
+
+  @test()
+  async closeOpenProxyRequestByUpstreamServer(): Promise<void> {
+    await this.initProxy();
+
+    let error: Error;
+    const promise = new FetchHelpers(this.mode, this.secure).get(`${this.proxyUrl}/hold`).catch(
+      err => error = err
+    )
+
+    await new Promise<void>((res) => setTimeout(() => {
+      this.server.stop().then(() => {
+        this.server = null;
+        res();
+      });
+    }, 50));
+    const resp = await promise;
+    console.log('@@@', resp);
+
+    //strictEqual(error.message, 'This operation was aborted');
   }
 
   @test()

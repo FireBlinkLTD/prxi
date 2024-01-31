@@ -103,6 +103,12 @@ export class HttpProxyHandler {
         });
 
         client.once('response', (response: IncomingMessage) => {
+          client.once('close', () => {
+            if (processed) return;
+
+            req.destroy(new Error('Request closed by the upstream server'));
+          });
+
           this.log.debug(context, `Response received`,{
             class: HttpProxyHandler.LOG_CLASS,
             method,

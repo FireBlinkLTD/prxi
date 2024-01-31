@@ -235,6 +235,7 @@ export class FetchHelpers {
           });
 
           req.once('end', () => {
+            console.log('FetchHelper -> req ended');
             if (count + 1 === this.repeat) {
               client.close();
 
@@ -266,6 +267,7 @@ export class FetchHelpers {
 
         makeRequest();
       } catch (e) {
+        console.error('FetchHelper -> req rejected', e);
         rej(e);
       }
     });
