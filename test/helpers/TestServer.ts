@@ -86,7 +86,14 @@ export class TestServer {
           }
 
           if (req.url.indexOf(`${this.prefix}/hold`) === 0) {
-            return;
+            res.setHeader("Cache-Control", "no-store");
+            res.setHeader("Content-Type", "text/event-stream");
+            res.write([
+              'event: ping',
+              'data: {"time": "' + new Date().toISOString() + '"}',
+            ].join('\n') + '\n\n');
+
+            return
           }
 
           console.log(`Unable to find handler for URL: ${req.url}`);
@@ -138,6 +145,17 @@ export class TestServer {
             }
 
             if (path.indexOf(`${this.prefix}/hold`) === 0) {
+              stream.respond({
+                'content-type': 'text/event-stream',
+                'Cache-Control': 'no-store',
+                [constants.HTTP2_HEADER_STATUS]: 200,
+              })
+
+              stream.write([
+                'event: ping',
+                'data: {"time": "' + new Date().toISOString() + '"}',
+              ].join('\n') + '\n\n');
+
               return;
             }
 

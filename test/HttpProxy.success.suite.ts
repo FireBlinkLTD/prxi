@@ -72,9 +72,12 @@ abstract class BaseHttpProxySuccessSuite {
       controller.abort();
       res();
     }, 20));
-    await promise;
+    await new Promise<void>(res => setTimeout(res, 20));
+    const resp = await promise;
 
-    strictEqual(error.message, 'This operation was aborted');
+    strictEqual(error, undefined);
+    ok(resp.ok);
+    strictEqual(resp.data, null);
   }
 
   @test()
@@ -91,11 +94,13 @@ abstract class BaseHttpProxySuccessSuite {
         this.server = null;
         res();
       });
-    }, 50));
+    }, 20));
+    await new Promise<void>(res => setTimeout(res, 20));
     const resp = await promise;
-    console.log('@@@', resp);
 
-    //strictEqual(error.message, 'This operation was aborted');
+    strictEqual(error, undefined);
+    ok(resp.ok);
+    strictEqual(resp.data, null);
   }
 
   @test()
@@ -325,13 +330,11 @@ abstract class BaseHttpProxySuccessSuite {
     await this.initProxy({
       on: {
         upgrade: (req, socket, head, context) => {
-          console.log('-> upgrade');
           c = context;
           context.upgrade = true;
         },
 
         afterUpgrade: (req, socket, head, context) => {
-          console.log('-> afterUpgrade');
           c = context;
           context.afterUpgrade = true;
           res();

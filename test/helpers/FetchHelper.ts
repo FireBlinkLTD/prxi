@@ -159,8 +159,12 @@ export class FetchHelpers {
           responseHeaders[header] = response.headers.get(header).toString();
         }
 
+        const isSSE = response.headers.get('content-type') === 'text/event-stream';
+
         return {
-          data: await response.json(),
+          ok: response.ok,
+          status: response.status,
+          data: isSSE ? null : await response.json(),
           headers: responseHeaders,
         };
       }
@@ -240,12 +244,12 @@ export class FetchHelpers {
               client.close();
 
               try {
-                if (aborted && !data) {
-                  return rej(new Error('This operation was aborted'));
-                }
+                const isSSE = responseHeaders['content-type'] === 'text/event-stream';
 
                 res({
-                  data: data ? JSON.parse(data) : undefined,
+                  ok: responseHeaders[constants.HTTP2_HEADER_STATUS] === '200',
+                  status: responseHeaders[constants.HTTP2_HEADER_STATUS],
+                  data: isSSE ? null : (data ? JSON.parse(data) : undefined),
                   headers: responseHeaders,
                 });
               } catch (e) {

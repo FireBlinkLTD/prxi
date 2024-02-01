@@ -81,102 +81,118 @@ export class HttpProxyHandler {
     const client = request(options);
     let processed = false;
 
-    req.socket.once('close', () => {
+    const onResClose = () => {
       if (processed) return;
+      processed = true;
 
-      client.destroy(new Error('Request closed by the client'));
-    });
+      client.destroy();
+    }
 
-    try {
-      await new Promise<void>((resolve, reject) => {
-        req.pipe(client);
+    const onUpstreamClose = () => {
+      if (processed) return;
+      processed = true;
 
-        client.once('error', (err) => {
-          this.log.error(context, `Proxy request failed`, err, {
-            class: HttpProxyHandler.LOG_CLASS,
-            method,
-            target,
-            path: url,
-          });
+      res.destroy();
+    }
 
-          reject(err);
+    res.once('close', onResClose);
+
+    await new Promise<void>((resolve, reject) => {
+      req.pipe(client);
+
+      client.once('error', (err) => {
+        this.log.error(context, `Proxy request failed`, err, {
+          class: HttpProxyHandler.LOG_CLASS,
+          method,
+          target,
+          path: url,
         });
 
-        client.once('response', (response: IncomingMessage) => {
-          client.once('close', () => {
-            if (processed) return;
+        processed = true;
+        reject(err);
+      });
 
-            req.destroy(new Error('Request closed by the upstream server'));
-          });
-
-          this.log.debug(context, `Response received`,{
+      client.once('response', (response: IncomingMessage) => {
+        client.once('close', () => {
+          this.log.debug(context, `Client closed`, {
             class: HttpProxyHandler.LOG_CLASS,
             method,
             target,
             path: url,
-            responseStatusCode: response.statusCode,
           });
 
-          if (isKeepAliveRequest) {
-            client.setTimeout(0);
-          }
+          onUpstreamClose();
+        });
 
-          // map status code
-          res.statusCode = response.statusCode;
+        this.log.debug(context, `Response received`,{
+          class: HttpProxyHandler.LOG_CLASS,
+          method,
+          target,
+          path: url,
+          responseStatusCode: response.statusCode,
+        });
 
-          const headersToSet = RequestUtils.prepareProxyHeaders(
-            response.headers,
-            this.configuration.responseHeaders,
-            this.upstream.responseHeaders,
-            // istanbul ignore next
-            proxyConfiguration?.proxyResponseHeaders
-          );
+        if (isKeepAliveRequest) {
+          client.setTimeout(0);
+        }
 
-          const next = () => {
-            RequestUtils.updateResponseHeaders(res, headersToSet);
+        // map status code
+        res.statusCode = response.statusCode;
 
-            // istanbul ignore else
-            if (!res.writableEnded) {
-              response.once('end', () => {
-                this.log.debug(context, `Proxy request completed`,{
-                  class: HttpProxyHandler.LOG_CLASS,
-                  method,
-                  target,
-                  path: url,
-                  responseStatusCode: response.statusCode,
-                });
-                resolve();
+        const headersToSet = RequestUtils.prepareProxyHeaders(
+          response.headers,
+          this.configuration.responseHeaders,
+          this.upstream.responseHeaders,
+          // istanbul ignore next
+          proxyConfiguration?.proxyResponseHeaders
+        );
+
+        const next = () => {
+          RequestUtils.updateResponseHeaders(res, headersToSet);
+
+          // istanbul ignore else
+          if (!res.writableEnded) {
+            response.once('end', () => {
+              this.log.debug(context, `Proxy request completed`,{
+                class: HttpProxyHandler.LOG_CLASS,
+                method,
+                target,
+                path: url,
+                responseStatusCode: response.statusCode,
               });
 
-              response.pipe(res);
-            } else {
+              processed = true;
               resolve();
-            }
-          }
+            });
 
-          /* istanbul ignore else */
-          if (proxyConfiguration && proxyConfiguration.onBeforeResponse) {
-            callOptionalPromiseFunction(
-              () => proxyConfiguration.onBeforeResponse(res, headersToSet, context),
-              () => next(),
-              (err) => {
-                this.log.error(context, 'onBeforeResponse function failed', err, {
-                  class: HttpProxyHandler.LOG_CLASS,
-                  method,
-                  target,
-                  path: url,
-                });
-
-                reject(err);
-              }
-            )
+            response.pipe(res);
           } else {
-            next();
+            processed = true;
+            resolve();
           }
-        });
+        }
+
+        /* istanbul ignore else */
+        if (proxyConfiguration && proxyConfiguration.onBeforeResponse) {
+          callOptionalPromiseFunction(
+            () => proxyConfiguration.onBeforeResponse(res, headersToSet, context),
+            () => next(),
+            (err) => {
+              this.log.error(context, 'onBeforeResponse function failed', err, {
+                class: HttpProxyHandler.LOG_CLASS,
+                method,
+                target,
+                path: url,
+              });
+
+              processed = true;
+              reject(err);
+            }
+          )
+        } else {
+          next();
+        }
       });
-    } finally {
-      processed = true;
-    }
+    });
   }
 }
